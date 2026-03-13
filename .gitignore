@@ -1,0 +1,55 @@
+# Dependencias
+node_modules/
+.npm/
+
+# Variables de entorno (NO subir al repo)
+.env
+!.env.example
+
+# Builds
+dist/
+build/
+.vite/
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+.docker/
+
+# Temporales
+tmp/
+temp/
+
+# Created by https://www.toptal.com/developers/gitignore/api/react
+# Edit at https://www.toptal.com/developers/gitignore?templates=react
+
+### react ###
+.DS_*
+*.log
+logs
+**/*.backup.*
+**/*.back.*
+
+node_modules
+bower_components
+
+*.sublime*
+
+psd
+thumb
+sketch
+
+# End of https://www.toptal.com/developers/gitignore/api/react

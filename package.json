@@ -1,0 +1,26 @@
+{
+  "name": "sge-unt",
+  "version": "1.0.0",
+  "description": "Sistema de Gestion de Egresados de la UNT",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "install:all": "concurrently \"cd modulo-1-registro/backend && npm install\" \"cd modulo-1-registro/frontend && npm install\" \"cd modulo-2-bolsa/backend && npm install\" \"cd modulo-2-bolsa/frontend && npm install\" \"cd modulo-3-seguimiento/backend && npm install\" \"cd modulo-3-seguimiento/frontend && npm install\" \"cd modulo-4-mentores/backend && npm install\" \"cd modulo-4-mentores/frontend && npm install\"",
+    "dev": "concurrently \"cd modulo-1-registro/backend && npm run dev\" \"cd modulo-2-bolsa/backend && npm run dev\" \"cd modulo-3-seguimiento/backend && npm run dev\" \"cd modulo-4-mentores/backend && npm run dev\" \"cd modulo-1-registro/frontend && npm run dev\"",
+    "dev:all": "concurrently \"cd modulo-1-registro/backend && npm run dev\" \"cd modulo-2-bolsa/backend && npm run dev\" \"cd modulo-3-seguimiento/backend && npm run dev\" \"cd modulo-4-mentores/backend && npm run dev\" \"cd modulo-1-registro/frontend && npm run dev\" \"cd modulo-2-bolsa/frontend && npm run dev\" \"cd modulo-3-seguimiento/frontend && npm run dev\" \"cd modulo-4-mentores/frontend && npm run dev\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "bcrypt": "^6.0.0",
+    "concurrently": "^9.2.1",
+    "dotenv": "^17.3.1",
+    "pg": "^8.20.0"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3"
+  }
+}

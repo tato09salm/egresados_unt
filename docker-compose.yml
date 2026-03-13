@@ -1,0 +1,189 @@
+version: '3.9'
+
+services:
+  # ─── Base de Datos PostgreSQL ───────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: sge_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: sa
+      POSTGRES_DB: egresados_unt
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    networks:
+      - sge_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d egresados_unt"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Módulo 1: Registro y Perfil ────────────────────────────────────────────
+  modulo1-backend:
+    build:
+      context: ./modulo-1-registro/backend
+      dockerfile: Dockerfile
+    container_name: sge_modulo1_backend
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: egresados_unt
+      DB_USER: postgres
+      DB_PASSWORD: sa
+      JWT_SECRET: sge_unt_secret_key_2024
+      JWT_EXPIRES_IN: 24h
+      PORT: 3001
+      NODE_ENV: production
+      CORS_ORIGIN: http://localhost:5173
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - sge_network
+
+  modulo1-frontend:
+    build:
+      context: ./modulo-1-registro/frontend
+      dockerfile: Dockerfile
+    container_name: sge_modulo1_frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - modulo1-backend
+    networks:
+      - sge_network
+
+  # ─── Módulo 2: Bolsa Laboral ─────────────────────────────────────────────────
+  modulo2-backend:
+    build:
+      context: ./modulo-2-bolsa/backend
+      dockerfile: Dockerfile
+    container_name: sge_modulo2_backend
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: egresados_unt
+      DB_USER: postgres
+      DB_PASSWORD: sa
+      JWT_SECRET: sge_unt_secret_key_2024
+      JWT_EXPIRES_IN: 24h
+      PORT: 3002
+      NODE_ENV: production
+      CORS_ORIGIN: http://localhost:5174
+    ports:
+      - "3002:3002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - sge_network
+
+  modulo2-frontend:
+    build:
+      context: ./modulo-2-bolsa/frontend
+      dockerfile: Dockerfile
+    container_name: sge_modulo2_frontend
+    restart: unless-stopped
+    ports:
+      - "5174:80"
+    depends_on:
+      - modulo2-backend
+    networks:
+      - sge_network
+
+  # ─── Módulo 3: Seguimiento ───────────────────────────────────────────────────
+  modulo3-backend:
+    build:
+      context: ./modulo-3-seguimiento/backend
+      dockerfile: Dockerfile
+    container_name: sge_modulo3_backend
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: egresados_unt
+      DB_USER: postgres
+      DB_PASSWORD: sa
+      JWT_SECRET: sge_unt_secret_key_2024
+      JWT_EXPIRES_IN: 24h
+      PORT: 3003
+      NODE_ENV: production
+      CORS_ORIGIN: http://localhost:5175
+    ports:
+      - "3003:3003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - sge_network
+
+  modulo3-frontend:
+    build:
+      context: ./modulo-3-seguimiento/frontend
+      dockerfile: Dockerfile
+    container_name: sge_modulo3_frontend
+    restart: unless-stopped
+    ports:
+      - "5175:80"
+    depends_on:
+      - modulo3-backend
+    networks:
+      - sge_network
+
+  # ─── Módulo 4: Red de Mentores ───────────────────────────────────────────────
+  modulo4-backend:
+    build:
+      context: ./modulo-4-mentores/backend
+      dockerfile: Dockerfile
+    container_name: sge_modulo4_backend
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: egresados_unt
+      DB_USER: postgres
+      DB_PASSWORD: sa
+      JWT_SECRET: sge_unt_secret_key_2024
+      JWT_EXPIRES_IN: 24h
+      PORT: 3004
+      NODE_ENV: production
+      CORS_ORIGIN: http://localhost:5176
+    ports:
+      - "3004:3004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - sge_network
+
+  modulo4-frontend:
+    build:
+      context: ./modulo-4-mentores/frontend
+      dockerfile: Dockerfile
+    container_name: sge_modulo4_frontend
+    restart: unless-stopped
+    ports:
+      - "5176:80"
+    depends_on:
+      - modulo4-backend
+    networks:
+      - sge_network
+
+volumes:
+  postgres_data:
+    name: sge_postgres_data
+
+networks:
+  sge_network:
+    name: sge_network
+    driver: bridge
