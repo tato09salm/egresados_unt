@@ -4,8 +4,6 @@ import api from '../../services/api_mentores';
 
 const s = {
   page: { minHeight:'100vh', background:'#f0f4f8' },
-  nav: { background:'#1a365d', color:'#fff', padding:'14px 32px', display:'flex', gap:16, alignItems:'center' },
-  back: { background:'rgba(255,255,255,.15)', border:'none', color:'#fff', padding:'6px 14px', borderRadius:6, cursor:'pointer', fontSize:13 },
   body: { maxWidth:820, margin:'0 auto', padding:'28px 16px' },
   card: { background:'#fff', borderRadius:12, padding:28, boxShadow:'0 2px 8px rgba(0,0,0,.06)', marginBottom:20 },
   avatar: { width:80, height:80, borderRadius:'50%', background:'#553c9a', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:32, fontWeight:700 },
@@ -48,10 +46,6 @@ export default function PerfilMentor() {
 
   return (
     <div style={s.page}>
-      <nav style={s.nav}>
-        <button style={s.back} onClick={() => navigate('/mentores')}>← Directorio</button>
-        <span style={{ fontWeight:700, fontSize:16 }}>🤝 Perfil de Mentor</span>
-      </nav>
       <div style={s.body}>
         {/* Header mentor */}
         <div style={s.card}>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import api from '../services/api';
 
 const s = {
@@ -17,6 +17,7 @@ const s = {
 export default function Encuesta() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [encuesta, setEncuesta] = useState(null);
   const [step, setStep] = useState(0);
   const [respuestas, setRespuestas] = useState({});
@@ -24,10 +25,12 @@ export default function Encuesta() {
   const [completada, setCompletada] = useState(false);
 
   useEffect(() => {
-    api.get(`/api/encuestas/${id}`)
+    const qs = new URLSearchParams(location.search);
+    const isPublic = qs.get('public') === '1';
+    api.get(`/api/encuestas/${id}${isPublic ? '?public=1' : ''}`)
       .then(r => setEncuesta(r.data.data))
       .catch(() => navigate('/dashboard'));
-  }, [id]);
+  }, [id, location.search]);
 
   if (!encuesta) return <div style={{ color:'#fff', textAlign:'center', padding:80 }}>Cargando...</div>;
 
