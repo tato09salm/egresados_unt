@@ -4,13 +4,11 @@ import api from '../../services/api_mentores';
 
 const s = {
   page: { minHeight:'100vh', background:'#f0f4f8' },
-  nav: { background:'#1a365d', color:'#fff', padding:'14px 32px', display:'flex', gap:16, alignItems:'center' },
   body: { maxWidth:800, margin:'0 auto', padding:'28px 16px' },
   card: { background:'#fff', borderRadius:12, padding:24, boxShadow:'0 2px 8px rgba(0,0,0,.06)', marginBottom:20 },
   badge: c => ({ display:'inline-block', padding:'4px 14px', borderRadius:20, fontSize:12, fontWeight:600, background:c+'22', color:c }),
   btn: { padding:'10px 22px', background:'#553c9a', color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontSize:13, fontWeight:600 },
   input: { width:'100%', padding:'8px 12px', border:'1.5px solid #e2e8f0', borderRadius:7, fontSize:13, outline:'none' },
-  back: { background:'rgba(255,255,255,.15)', border:'none', color:'#fff', padding:'6px 14px', borderRadius:6, cursor:'pointer', fontSize:13 },
 };
 
 const estadoColor = { pendiente:'#d69e2e', aceptada:'#276749', rechazada:'#e53e3e', expirada:'#a0aec0' };
@@ -63,10 +61,6 @@ export default function MiMentoria() {
 
   return (
     <div style={s.page}>
-      <nav style={s.nav}>
-        <button style={s.back} onClick={() => navigate('/mentores')}>← Directorio</button>
-        <span style={{ fontWeight:700, fontSize:16 }}>📚 Mi Mentoría</span>
-      </nav>
       <div style={s.body}>
 
         {/* Estado de solicitud actual */}
@@ -107,7 +101,6 @@ export default function MiMentoria() {
                   <span style={s.badge(se.realizada ? '#276749' : '#d69e2e')}>{se.realizada ? 'Realizada' : 'Pendiente'}</span>
                 </div>
                 {se.notas_mentor && <div style={{ marginTop:8, fontSize:12, color:'#4a5568', background:'#f7fafc', padding:'8px 12px', borderRadius:6 }}>Notas del mentor: {se.notas_mentor}</div>}
-                {/* Formulario de evaluación */}
                 {se.realizada && evalData.sesionId !== se.id_sesion && (
                   <button style={{ ...s.btn, marginTop:10, fontSize:12, padding:'6px 14px', background:'#f3e8ff', color:'#553c9a' }}
                     onClick={() => setEvalData({ sesionId:se.id_sesion, cal:0, comentario:'' })}>

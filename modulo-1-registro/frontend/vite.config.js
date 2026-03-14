@@ -17,7 +17,11 @@ export default defineConfig({
       ]
     },
     proxy: {
-      '/api': { target: 'http://localhost:3001', changeOrigin: true }
+      '/api/mentores':  { target: 'http://localhost:3004', changeOrigin: true },
+      '/api/mentoria':  { target: 'http://localhost:3004', changeOrigin: true },
+      '/api/sesiones':  { target: 'http://localhost:3004', changeOrigin: true },
+      '/api/mentorado': { target: 'http://localhost:3004', changeOrigin: true },
+      '/api':           { target: 'http://localhost:3001', changeOrigin: true }
     }
   }
 });
