@@ -4,6 +4,13 @@ const { success, error } = require('../../../shared/utils/response');
 // GET /api/dashboard/facultad/:id
 exports.porFacultad = async (req, res, next) => {
   try {
+    const { anio } = req.query;
+    const params = [req.params.id];
+    let cond = '';
+    if (anio) {
+      params.push(anio);
+      cond = ` AND ie.anio=$2`;
+    }
     const r = await db.query(
       `SELECT ie.anio, ie.mes,
               AVG(ie.tasa_empleabilidad)     AS tasa_empleabilidad,
@@ -12,9 +19,9 @@ exports.porFacultad = async (req, res, next) => {
               COUNT(DISTINCT ie.id_escuela)  AS escuelas
        FROM egresados_unt.indicadores_empleabilidad ie
        JOIN egresados_unt.escuelas es ON es.id_escuela=ie.id_escuela
-       WHERE es.id_facultad=$1
+       WHERE es.id_facultad=$1${cond}
        GROUP BY ie.anio, ie.mes ORDER BY ie.anio DESC, ie.mes DESC LIMIT 24`,
-      [req.params.id]
+      params
     );
     // Escuelas de la facultad
     const escuelas = await db.query(
@@ -23,8 +30,9 @@ exports.porFacultad = async (req, res, next) => {
               ROUND(AVG(ie.salario_promedio)::numeric, 0)   AS salario
        FROM egresados_unt.escuelas es
        LEFT JOIN egresados_unt.indicadores_empleabilidad ie ON ie.id_escuela=es.id_escuela
-       WHERE es.id_facultad=$1 GROUP BY es.id_escuela, es.nombre ORDER BY tasa DESC NULLS LAST`,
-      [req.params.id]
+       WHERE es.id_facultad=$1${cond}
+       GROUP BY es.id_escuela, es.nombre ORDER BY tasa DESC NULLS LAST`,
+      params
     );
     success(res, { tendencia: r.rows, escuelas: escuelas.rows });
   } catch (e) { next(e); }

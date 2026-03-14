@@ -9,6 +9,7 @@ app.use('/api/auth',      require('./routes/auth.routes'));
 app.use('/api/encuestas', require('./routes/encuestas.routes'));
 app.use('/api/dashboard', require('./routes/dashboard.routes'));
 app.use('/api/reportes',  require('./routes/reportes.routes'));
+app.use('/api/catalogo',  require('./routes/catalogo.routes'));
 
 app.get('/api/health', (req, res) => res.json({ success:true, message:'Módulo 3 - Seguimiento: OK' }));
 app.use((req, res) => res.status(404).json({ success:false, message:'Ruta no encontrada' }));
