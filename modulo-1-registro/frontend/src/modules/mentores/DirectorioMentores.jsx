@@ -4,7 +4,6 @@ import api from '../../services/api_mentores';
 
 const s = {
   page: { minHeight:'100vh', background:'#f0f4f8' },
-  nav:  { background:'#1a365d', color:'#fff', padding:'14px 32px', display:'flex', justifyContent:'space-between', alignItems:'center' },
   body: { maxWidth:1100, margin:'0 auto', padding:'28px 16px' },
   filters: { background:'#fff', borderRadius:10, padding:18, marginBottom:24, display:'flex', gap:12, flexWrap:'wrap', boxShadow:'0 1px 4px rgba(0,0,0,.06)' },
   input:  { padding:'8px 12px', border:'1.5px solid #e2e8f0', borderRadius:7, fontSize:13, outline:'none', minWidth:150 },
@@ -14,7 +13,6 @@ const s = {
   card:   { background:'#fff', borderRadius:12, padding:22, boxShadow:'0 2px 8px rgba(0,0,0,.06)', cursor:'pointer', transition:'transform .15s' },
   avatar: { width:56, height:56, borderRadius:'50%', background:'#553c9a', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22, fontWeight:700, flexShrink:0 },
   tag:    { display:'inline-block', padding:'3px 9px', background:'#f3e8ff', color:'#553c9a', borderRadius:20, fontSize:11, fontWeight:500, margin:2 },
-  logoutBtn: { background:'rgba(255,255,255,.15)', border:'none', color:'#fff', padding:'6px 14px', borderRadius:6, cursor:'pointer', fontSize:13 },
 };
 
 function Stars({ val }) {
@@ -49,8 +47,6 @@ export default function DirectorioMentores() {
     } catch(e) { if(e.response?.status===401) navigate('/login'); }
     setLoading(false);
   };
-
-  const logout = () => { localStorage.removeItem('sge_token'); localStorage.removeItem('sge_user'); navigate('/login'); };
 
   return (
     <div style={s.page}>

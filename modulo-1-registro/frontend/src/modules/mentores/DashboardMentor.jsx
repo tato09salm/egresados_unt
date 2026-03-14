@@ -4,12 +4,10 @@ import api from '../../services/api_mentores';
 
 const s = {
   page: { minHeight:'100vh', background:'#f0f4f8' },
-  nav: { background:'#1a365d', color:'#fff', padding:'14px 32px', display:'flex', justifyContent:'space-between', alignItems:'center' },
   body: { maxWidth:1000, margin:'0 auto', padding:'28px 16px' },
   card: { background:'#fff', borderRadius:12, padding:24, boxShadow:'0 2px 8px rgba(0,0,0,.06)', marginBottom:20 },
   badge: c => ({ display:'inline-block', padding:'4px 12px', borderRadius:20, fontSize:12, fontWeight:600, background:c+'22', color:c }),
   btn:  c => ({ padding:'8px 18px', background:c, color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontSize:12, fontWeight:600 }),
-  logoutBtn: { background:'rgba(255,255,255,.15)', border:'none', color:'#fff', padding:'6px 14px', borderRadius:6, cursor:'pointer', fontSize:13 },
   input: { width:'100%', padding:'8px 12px', border:'1.5px solid #e2e8f0', borderRadius:7, fontSize:13, outline:'none' },
   registerCard: { background:'#f3e8ff', borderRadius:12, padding:24, border:'1px solid #d6bcfa' },
 };
@@ -76,17 +74,8 @@ export default function DashboardMentor() {
   const pendientes = solicitudes.filter(s => s.estado === 'pendiente');
   const aceptadas  = solicitudes.filter(s => s.estado === 'aceptada');
 
-  const logout = () => { localStorage.removeItem('sge_token'); localStorage.removeItem('sge_user'); navigate('/login'); };
-
   return (
     <div style={s.page}>
-      <nav style={s.nav}>
-        <span style={{ fontWeight:700, fontSize:16 }}>🏅 Panel del Mentor</span>
-        <div style={{ display:'flex', gap:12 }}>
-          <button style={s.logoutBtn} onClick={() => navigate('/mentores')}>Directorio</button>
-          <button style={s.logoutBtn} onClick={logout}>Salir</button>
-        </div>
-      </nav>
       <div style={s.body}>
 
         {/* KPIs */}
