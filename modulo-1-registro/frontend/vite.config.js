@@ -12,7 +12,8 @@ export default defineConfig({
     fs: {
       allow: [
         __dirname,
-        path.resolve(__dirname, '../../shared')
+        path.resolve(__dirname, '../../shared'),
+        path.resolve(__dirname, '../../modulo-3-seguimiento/frontend')
       ]
     },
     proxy: {

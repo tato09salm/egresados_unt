@@ -61,6 +61,7 @@ export default function App() {
           {/* Módulo 3: Seguimiento */}
           <Route path="/seguimiento"        element={<DashboardSeguimiento />} />
           <Route path="/seguimiento/encuesta/:id" element={<Encuesta />} />
+          <Route path="/encuesta/:id"       element={<Encuesta />} />
 
           {/* Módulo 4: Mentores */}
           <Route path="/mentores"           element={<DirectorioMentores />} />
