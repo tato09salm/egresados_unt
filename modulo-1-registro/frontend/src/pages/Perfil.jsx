@@ -44,6 +44,11 @@ export default function Perfil() {
   const user = JSON.parse(localStorage.getItem('sge_user') || '{}');
 
   useEffect(() => {
+    // Si el usuario tiene id_egresado, redirigir a PerfilEgresado que es el componente completo
+    if (user.id_egresado) {
+      navigate('/perfil-egresado');
+      return;
+    }
     loadPerfil();
     api.get('/api/perfil/habilidades').then(r => setHabilidades(r.data.data || []));
   }, []);
@@ -160,9 +165,19 @@ export default function Perfil() {
                 ? 'Esta cuenta no está asociada a un egresado. Inicia sesión con un egresado para ver y editar el perfil.'
                 : 'No se encontró un egresado asociado a tu cuenta. Si acabas de registrarte, intenta recargar.'}
             </p>
-            <div style={{display:'flex', gap:12, marginTop:16}}>
-              <button style={{...s.btn, background:'#1a365d'}} onClick={() => navigate('/dashboard')}>Ir a Inicio</button>
-              <button style={s.btn} onClick={loadPerfil}>Reintentar</button>
+            <div style={{display:'flex', gap:12, marginTop:24, flexDirection: 'column', alignItems: 'center'}}>
+              {isAdmin && (
+                <button 
+                  style={{...s.btn, background:'#166534', padding: '16px 32px', fontSize: 16, width: '100%', maxWidth: 400}} 
+                  onClick={() => navigate('/admin/egresados/crear')}
+                >
+                  ➕ REGISTRAR EGRESADO
+                </button>
+              )}
+              <div style={{display: 'flex', gap: 12, width: '100%', justifyContent: 'center'}}>
+                <button style={{...s.btn, background:'#1a365d', flex: 1, maxWidth: 200}} onClick={() => navigate('/dashboard')}>Ir a Inicio</button>
+                <button style={{...s.btn, flex: 1, maxWidth: 200}} onClick={loadPerfil}>Reintentar</button>
+              </div>
             </div>
           </div>
         </div>
@@ -197,9 +212,19 @@ export default function Perfil() {
               <span style={{...s.badge, background:'#fff5f5', color:'#c53030'}}>DNI: {egresado.num_doc}</span>
             </div>
           </div>
-          <button style={{...s.btn, background:'#1a365d'}} onClick={() => setEditing(!editing)}>
-            {editing ? 'Cancelar' : '⚙️ Configurar Perfil'}
-          </button>
+          <div style={{display: 'flex', flexDirection: 'column', gap: 10}}>
+            {user.isAdmin && (
+              <button 
+                style={{...s.btn, background:'#166534', padding: '10px 20px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6}} 
+                onClick={() => navigate('/admin/egresados/crear')}
+              >
+                ➕ REGISTRAR EGRESADO
+              </button>
+            )}
+            <button style={{...s.btn, background:'#1a365d'}} onClick={() => setEditing(!editing)}>
+              {editing ? 'Cancelar' : '⚙️ Configurar Perfil'}
+            </button>
+          </div>
         </div>
 
         {/* Resumen y CV Inteligente */}

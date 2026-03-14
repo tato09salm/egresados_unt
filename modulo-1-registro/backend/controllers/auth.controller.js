@@ -63,17 +63,17 @@ exports.register = async (req, res, next) => {
     // 2. Crear egresado
     const egresadoResult = await client.query(
       `INSERT INTO egresados_unt.egresados
-         (id_persona, codigo_universitario, id_escuela, promocion, anio_ingreso, anio_egreso, anio_titulacion, promedio, sunedu_validado, fecha_validacion_sunedu)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW()) RETURNING id_egresado`,
+         (id_persona, codigo_universitario, id_escuela, promocion, anio_ingreso, anio_egreso, anio_titulacion, promedio)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id_egresado`,
       [id_persona, codigo_universitario, id_escuela, promocion || null,
-       anio_ingreso || null, anio_egreso || null, anio_titulacion || null, promedio || null, suneduValidated.success]
+       anio_ingreso || null, anio_egreso || null, anio_titulacion || null, promedio || null]
     );
     const id_egresado = egresadoResult.rows[0].id_egresado;
 
     // 3. Crear perfil profesional vacío
     await client.query(
-      'INSERT INTO egresados_unt.perfiles_profesionales (id_egresado, sunedu_grado) VALUES ($1, $2)',
-      [id_egresado, suneduValidated.grado]
+      'INSERT INTO egresados_unt.perfiles_profesionales (id_egresado) VALUES ($1)',
+      [id_egresado]
     );
 
     // 4. Crear usuario
@@ -165,6 +165,8 @@ exports.login = async (req, res, next) => {
         apellidos: user.apellidos,
         email: user.email,
         rol: user.rol,
+        es_admin: user.rol === 'admin',
+        tiene_egresado: !!user.id_egresado
       }
     }, 'Login exitoso');
   } catch (err) {
@@ -192,6 +194,44 @@ exports.me = async (req, res, next) => {
     );
     if (result.rows.length === 0) return error(res, 'Usuario no encontrado', 404);
     success(res, result.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * PUT /api/usuarios/:id/cambiar-password
+ */
+exports.changePassword = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { oldPassword, newPassword } = req.body;
+
+    if (req.user.id_usuario !== id && req.user.rol !== 'admin') {
+      return error(res, 'No tiene permiso para cambiar esta contraseña', 403);
+    }
+
+    if (!oldPassword || !newPassword) {
+      return error(res, 'Se requiere la contraseña anterior y la nueva', 400);
+    }
+
+    // Buscar usuario
+    const userResult = await db.query('SELECT password_hash FROM egresados_unt.usuarios WHERE id_usuario = $1', [id]);
+    if (userResult.rows.length === 0) return error(res, 'Usuario no encontrado', 404);
+
+    const user = userResult.rows[0];
+
+    // Verificar contraseña anterior
+    const isValid = await bcrypt.compare(oldPassword, user.password_hash);
+    if (!isValid) return error(res, 'La contraseña actual es incorrecta', 401);
+
+    // Hashear nueva contraseña
+    const newHash = await bcrypt.hash(newPassword, 10);
+
+    // Actualizar
+    await db.query('UPDATE egresados_unt.usuarios SET password_hash = $1 WHERE id_usuario = $2', [newHash, id]);
+
+    success(res, null, 'Contraseña actualizada exitosamente');
   } catch (err) {
     next(err);
   }

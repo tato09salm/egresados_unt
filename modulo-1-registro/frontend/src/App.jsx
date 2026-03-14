@@ -5,6 +5,10 @@ import Login    from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
 import Perfil   from './pages/Perfil.jsx';
 import Dashboard from './pages/Dashboard.jsx';
+import RegistroEgresado from './pages/RegistroEgresado.jsx';
+import PerfilEgresado from './pages/PerfilEgresado.jsx';
+import AdminUsuarios from './pages/admin/AdminUsuarios.jsx';
+import AdminEgresadosCrear from './pages/admin/AdminEgresadosCrear.jsx';
 
 // Páginas del Módulo 2 (Bolsa)
 import BolsaLaboral from './modules/bolsa/BolsaLaboral.jsx';
@@ -44,12 +48,17 @@ export default function App() {
         {/* Rutas Públicas */}
         <Route path="/login"    element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/registro-egresado" element={<RegistroEgresado />} />
 
         {/* Rutas Privadas con Navbar */}
         <Route element={<PrivateLayout />}>
           {/* Módulo 1: Registro */}
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/perfil"    element={<Perfil />} />
+          <Route path="/perfil"    element={<PerfilEgresado />} />
+          <Route path="/perfil-egresado" element={<PerfilEgresado />} />
+          <Route path="/perfil-egresado/:id" element={<PerfilEgresado />} />
+          <Route path="/admin/usuarios" element={<AdminUsuarios />} />
+          <Route path="/admin/egresados/crear" element={<AdminEgresadosCrear />} />
 
           {/* Módulo 2: Bolsa Laboral */}
           <Route path="/bolsa"              element={<BolsaLaboral />} />

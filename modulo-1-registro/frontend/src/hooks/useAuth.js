@@ -13,10 +13,17 @@ export function useAuth() {
     try {
       const res = await api.post('/api/auth/login', { username, password });
       const { token, user: userData } = res.data.data;
+      
+      const authData = {
+        ...userData,
+        isAdmin: userData.rol === 'admin',
+        hasEgresado: !!userData.id_egresado
+      };
+
       localStorage.setItem('sge_token', token);
-      localStorage.setItem('sge_user', JSON.stringify(userData));
-      setUser(userData);
-      return userData;
+      localStorage.setItem('sge_user', JSON.stringify(authData));
+      setUser(authData);
+      return authData;
     } catch (err) {
       const msg = err.response?.data?.message || 'Error al iniciar sesión';
       setError(msg); throw new Error(msg);
@@ -31,9 +38,17 @@ export function useAuth() {
       localStorage.setItem('sge_token', token);
       // Fetch user data
       const me = await api.get('/api/auth/me');
-      localStorage.setItem('sge_user', JSON.stringify(me.data.data));
-      setUser(me.data.data);
-      return me.data.data;
+      const userData = me.data.data;
+      
+      const authData = {
+        ...userData,
+        isAdmin: userData.rol === 'admin',
+        hasEgresado: !!userData.id_egresado
+      };
+
+      localStorage.setItem('sge_user', JSON.stringify(authData));
+      setUser(authData);
+      return authData;
     } catch (err) {
       const msg = err.response?.data?.message || 'Error al registrarse';
       setError(msg); throw new Error(msg);
@@ -46,5 +61,15 @@ export function useAuth() {
     setUser(null);
   }, []);
 
-  return { user, loading, error, login, register, logout, isAuthenticated: !!user };
+  return { 
+    user, 
+    loading, 
+    error, 
+    login, 
+    register, 
+    logout, 
+    isAuthenticated: !!user,
+    isAdmin: user?.isAdmin || false,
+    userData: user
+  };
 }

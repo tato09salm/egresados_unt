@@ -19,6 +19,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/auth',      require('./routes/auth.routes'));
 app.use('/api/egresados', require('./routes/egresados.routes'));
 app.use('/api/perfil',    require('./routes/perfil.routes'));
+app.use('/api/admin',     require('./routes/admin.routes'));
+app.use('/api/usuarios',  require('./routes/usuarios.routes'));
 
 // Health check
 app.get('/api/health', (req, res) => {

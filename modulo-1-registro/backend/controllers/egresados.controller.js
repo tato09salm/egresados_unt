@@ -2,6 +2,43 @@ const db = require('../config/database');
 const { success, error, paginate } = require('../../../shared/utils/response');
 
 /**
+ * GET /api/egresados/perfil
+ * Obtener perfil del usuario autenticado
+ */
+exports.getProfile = async (req, res, next) => {
+  try {
+    if (!req.user || !req.user.id_persona) {
+      console.error('❌ Error en getProfile: Usuario no tiene id_persona en el token');
+      return error(res, 'Usuario no autenticado correctamente', 401);
+    }
+    
+    console.log(`🔍 Buscando perfil para id_persona: ${req.user.id_persona} (Rol: ${req.user.rol})`);
+    
+    // Buscar el id_egresado usando el id_persona que SIEMPRE está en el token
+    const result = await db.query(
+      'SELECT id_egresado FROM egresados_unt.egresados WHERE id_persona = $1',
+      [req.user.id_persona]
+    );
+
+    if (result.rows.length === 0) {
+      console.warn(`⚠️ No se encontró registro en egresados para id_persona: ${req.user.id_persona}`);
+      // Si el usuario tiene rol de egresado pero no tiene registro en egresados, 
+      // es una inconsistencia que debemos manejar
+      if (req.user.rol === 'egresado') {
+        return error(res, 'No se encontró un perfil de egresado asociado a esta cuenta. Por favor, contacte al administrador.', 404);
+      }
+      return error(res, 'Esta cuenta no tiene un perfil de egresado asociado', 404);
+    }
+
+    console.log(`✅ Encontrado id_egresado: ${result.rows[0].id_egresado}`);
+    req.params.id = result.rows[0].id_egresado;
+    return exports.getById(req, res, next);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * GET /api/egresados/:id
  * Obtener perfil completo de un egresado
  */
@@ -16,7 +53,7 @@ exports.getById = async (req, res, next) => {
               es.id_escuela, es.nombre AS escuela,
               f.id_facultad, f.nombre AS facultad,
               pp.resumen, pp.linkedin_url, pp.github_url, pp.portfolio_url,
-              pp.disponibilidad, pp.modalidad_trabajo, pp.pretension_salarial, pp.privacidad_perfil, pp.sunedu_grado
+              pp.disponibilidad, pp.modalidad_trabajo, pp.pretension_salarial
        FROM egresados_unt.egresados e
        JOIN egresados_unt.personas p    ON p.id_persona  = e.id_persona
        JOIN egresados_unt.escuelas es   ON es.id_escuela = e.id_escuela
@@ -29,36 +66,33 @@ exports.getById = async (req, res, next) => {
 
     const egresado = result.rows[0];
 
-    // Habilidades
-    const habilidades = await db.query(
+    // Fetch habilidades
+    const habs = await db.query(
       `SELECT h.id_habilidad, h.nombre, h.categoria, eh.nivel
-       FROM egresados_unt.egresado_habilidades eh
-       JOIN egresados_unt.habilidades h ON h.id_habilidad = eh.id_habilidad
+       FROM egresados_unt.habilidades h
+       JOIN egresados_unt.egresado_habilidades eh ON eh.id_habilidad = h.id_habilidad
        WHERE eh.id_egresado = $1`,
       [id]
     );
-    egresado.habilidades = habilidades.rows;
 
-    // Experiencias
-    const experiencias = await db.query(
-      `SELECT * FROM egresados_unt.experiencias_laborales WHERE id_egresado = $1 ORDER BY fecha_inicio DESC`,
+    // Fetch experiencias
+    const exps = await db.query(
+      `SELECT * FROM egresados_unt.experiencias_laborales 
+       WHERE id_egresado = $1 ORDER BY fecha_inicio DESC`,
       [id]
     );
-    egresado.experiencias = experiencias.rows;
 
-    // Educación continua
-    const educacion = await db.query(
-      `SELECT * FROM egresados_unt.educacion_continua WHERE id_egresado = $1 ORDER BY fecha_inicio DESC`,
+    // Fetch educacion continua
+    const edus = await db.query(
+      `SELECT * FROM egresados_unt.educacion_continua 
+       WHERE id_egresado = $1 ORDER BY fecha_inicio DESC`,
       [id]
     );
-    egresado.educacion = educacion.rows;
 
-    // Proyectos
-    const proyectos = await db.query(
-      `SELECT * FROM egresados_unt.proyectos_egresado WHERE id_egresado = $1 ORDER BY fecha_creacion DESC`,
-      [id]
-    );
-    egresado.proyectos = proyectos.rows;
+    egresado.habilidades = habs.rows;
+    egresado.experiencias = exps.rows;
+    egresado.educacion = edus.rows;
+    egresado.proyectos = []; // No hay tabla de proyectos aún
 
     success(res, egresado);
   } catch (err) {
@@ -77,19 +111,19 @@ exports.update = async (req, res, next) => {
       return error(res, 'No tiene permiso para actualizar este perfil', 403);
     }
 
-    const { nombres, apellidos, telefono, direccion, situacion_laboral } = req.body;
+    const { nombres, apellidos, email, telefono, direccion, situacion_laboral } = req.body;
 
     // Obtener id_persona del egresado
     const egr = await db.query('SELECT id_persona FROM egresados_unt.egresados WHERE id_egresado = $1', [id]);
     if (egr.rows.length === 0) return error(res, 'Egresado no encontrado', 404);
     const { id_persona } = egr.rows[0];
 
-    if (nombres || apellidos || telefono || direccion !== undefined) {
+    if (nombres || apellidos || email || telefono || direccion !== undefined) {
       await db.query(
         `UPDATE egresados_unt.personas
-         SET nombres=$1, apellidos=$2, telefono=$3, direccion=$4
-         WHERE id_persona=$5`,
-        [nombres, apellidos, telefono, direccion, id_persona]
+         SET nombres=$1, apellidos=$2, email=$3, telefono=$4, direccion=$5
+         WHERE id_persona=$6`,
+        [nombres, apellidos, email, telefono, direccion, id_persona]
       );
     }
 
@@ -183,6 +217,37 @@ exports.getAll = async (req, res, next) => {
       [limit, offset]
     );
     success(res, result.rows, 'Egresados obtenidos', 200, paginate(page, limit, total));
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /api/egresados/:id/foto
+ * Sube foto de perfil (simulado con URL/Base64)
+ */
+exports.updateFoto = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { foto_url } = req.body; // El frontend enviará el base64 o URL
+
+    if (req.user.id_egresado !== id && req.user.rol !== 'admin') {
+      return error(res, 'No tiene permiso para actualizar esta foto', 403);
+    }
+
+    if (!foto_url) {
+      return error(res, 'La foto_url es requerida', 400);
+    }
+
+    await db.query(
+      `UPDATE egresados_unt.personas p
+       SET foto_url = $1
+       FROM egresados_unt.egresados e
+       WHERE e.id_persona = p.id_persona AND e.id_egresado = $2`,
+      [foto_url, id]
+    );
+
+    success(res, { foto_url }, 'Foto de perfil actualizada exitosamente');
   } catch (err) {
     next(err);
   }
