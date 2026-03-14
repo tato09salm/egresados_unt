@@ -81,7 +81,7 @@ npm install
 npm run dev
 
 # Terminal 4 — Módulo 4: Mentores (puerto 3004)
-cd modulo-3-seguimiento/backend
+cd modulo-4-mentores/backend
 cp .env.example .env
 npm install
 npm run dev
