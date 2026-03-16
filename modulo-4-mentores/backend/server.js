@@ -1,9 +1,14 @@
 require('dotenv').config();
 const express = require('express');
 const cors    = require('cors');
+const path    = require('path');
 const app = express();
+
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*', credentials: true }));
 app.use(express.json());
+
+// Servir archivos subidos (fotos de mentores)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use('/api/auth',     require('./routes/auth.routes'));
 app.use('/api/mentores', require('./routes/mentores.routes'));
@@ -16,4 +21,15 @@ app.use((req, res) => res.status(404).json({ success:false, message:'Ruta no enc
 app.use(require('../../shared/middleware/errorHandler'));
 
 const PORT = process.env.PORT || 3004;
-app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Módulo 4 (Mentores) corriendo en puerto ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Módulo 4 (Mentores) corriendo en puerto ${PORT}`);
+
+  // Expirar solicitudes pendientes > 7 días (cada hora)
+  const mentoriaCtrl = require('./controllers/mentoria.controller');
+  if (mentoriaCtrl.expirarSolicitudes) {
+    mentoriaCtrl.expirarSolicitudes();
+    setInterval(mentoriaCtrl.expirarSolicitudes, 60 * 60 * 1000);
+  } else {
+    console.log('⚠️ expirarSolicitudes no está definida en mentoria.controller.js');
+  }
+});
