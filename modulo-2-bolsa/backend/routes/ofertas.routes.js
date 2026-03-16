@@ -5,6 +5,7 @@ const { verifyToken } = require('../../../shared/middleware/auth');
 
 router.get('/',             verifyToken, ctrl.getAll);
 router.post('/',            verifyToken, ctrl.create);
+router.get('/sectores',     verifyToken, ctrl.getSectores);
 router.get('/habilidades',  verifyToken, ctrl.getHabilidades);
 router.get('/:id',          verifyToken, ctrl.getById);
 router.put('/:id',          verifyToken, ctrl.update);

@@ -8,7 +8,7 @@ exports.getAll = async (req, res, next) => {
     const page = Math.max(parseInt(req.query.page || 1, 10), 1);
     const limit = Math.max(parseInt(req.query.limit || 10, 10), 1);
     const offset = (page - 1) * limit;
-    const { modalidad, sector, salario_min, salario_max, habilidad, estado, mine } = req.query;
+    const { modalidad, sector, salario_min, salario_max, habilidad, habilidades, tipo_contrato, estado, mine } = req.query;
 
     const cond = [];
     const params = [];
@@ -28,9 +28,23 @@ exports.getAll = async (req, res, next) => {
     }
 
     if (modalidad) { cond.push(`o.modalidad = $${idx++}`); params.push(modalidad); }
-    if (sector)    { cond.push(`emp.sector ILIKE $${idx++}`); params.push(`%${sector}%`); }
-    if (salario_min) { cond.push(`COALESCE(o.salario_max, o.salario_min, 0) >= $${idx++}`); params.push(Number(salario_min)); }
-    if (salario_max) { cond.push(`COALESCE(o.salario_min, o.salario_max, 0) <= $${idx++}`); params.push(Number(salario_max)); }
+    if (tipo_contrato) { cond.push(`o.tipo_contrato = $${idx++}`); params.push(tipo_contrato); }
+    if (sector)    { cond.push(`LOWER(emp.sector) = LOWER($${idx++})`); params.push(sector); }
+
+    let salarioMinNum = salario_min !== undefined && salario_min !== '' ? Number(salario_min) : null;
+    let salarioMaxNum = salario_max !== undefined && salario_max !== '' ? Number(salario_max) : null;
+    if (salarioMinNum !== null && salarioMaxNum !== null && salarioMinNum > salarioMaxNum) {
+      [salarioMinNum, salarioMaxNum] = [salarioMaxNum, salarioMinNum];
+    }
+    if (salarioMinNum !== null) {
+      cond.push(`COALESCE(o.salario_min, o.salario_max, 0) >= $${idx++}`);
+      params.push(salarioMinNum);
+    }
+    if (salarioMaxNum !== null) {
+      cond.push(`COALESCE(o.salario_max, o.salario_min, 0) <= $${idx++}`);
+      params.push(salarioMaxNum);
+    }
+
     if (habilidad) {
       cond.push(`EXISTS (
         SELECT 1
@@ -40,6 +54,22 @@ exports.getAll = async (req, res, next) => {
           AND h.nombre ILIKE $${idx++}
       )`);
       params.push(`%${habilidad}%`);
+    }
+
+    const habilidadesSeleccionadas = (habilidades || '')
+      .split(',')
+      .map((h) => h.trim().toLowerCase())
+      .filter(Boolean);
+
+    if (habilidadesSeleccionadas.length > 0) {
+      cond.push(`EXISTS (
+        SELECT 1
+        FROM bolsa_laboral.oferta_habilidades oh
+        JOIN egresados_unt.habilidades h ON h.id_habilidad = oh.id_habilidad
+        WHERE oh.id_oferta = o.id_oferta
+          AND LOWER(h.nombre) = ANY($${idx++}::text[])
+      )`);
+      params.push(habilidadesSeleccionadas);
     }
 
     const where = cond.length ? `WHERE ${cond.join(' AND ')}` : '';
@@ -66,6 +96,20 @@ exports.getAll = async (req, res, next) => {
     }
 
     success(res, data, 'Ofertas obtenidas', 200, paginate(page, limit, parseInt(cnt.rows[0].count, 10)));
+  } catch (e) { next(e); }
+};
+
+// GET /api/ofertas/sectores
+exports.getSectores = async (req, res, next) => {
+  try {
+    const r = await db.query(
+      `SELECT DISTINCT emp.sector
+       FROM bolsa_laboral.ofertas_laborales o
+       JOIN bolsa_laboral.empresas emp ON emp.id_empresa = o.id_empresa
+       WHERE emp.sector IS NOT NULL AND TRIM(emp.sector) <> ''
+       ORDER BY emp.sector`
+    );
+    success(res, r.rows.map((x) => x.sector));
   } catch (e) { next(e); }
 };
 

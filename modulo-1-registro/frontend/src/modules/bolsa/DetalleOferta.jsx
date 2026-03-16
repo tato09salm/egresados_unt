@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import api from '../../services/api_bolsa';
 
 const s = {
   page: { minHeight:'100vh', background:'#f0f4f8' },
   nav:  { background:'#1a365d', color:'#fff', padding:'14px 32px', display:'flex', gap:16, alignItems:'center' },
   back: { background:'rgba(255,255,255,.15)', border:'none', color:'#fff', padding:'6px 14px', borderRadius:6, cursor:'pointer', fontSize:13 },
+  pdf: { background:'#ef4444', border:'1px solid #fca5a5', color:'#fff', padding:'6px 14px', borderRadius:6, cursor:'pointer', fontSize:13, fontWeight:800 },
   body: { maxWidth:820, margin:'0 auto', padding:'28px 16px' },
   card: { background:'#fff', borderRadius:12, padding:28, boxShadow:'0 2px 8px rgba(0,0,0,.06)', marginBottom:20 },
   h2:   { fontSize:22, fontWeight:700, color:'#1a365d', marginBottom:8 },
@@ -30,6 +33,49 @@ export default function DetalleOferta() {
     api.get(`/api/ofertas/${id}`).then(r => setOferta(r.data.data)).catch(() => navigate('/bolsa'));
   }, [id]);
 
+  const descargarPdfOferta = () => {
+    if (!oferta) return;
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text('SGE-UNT | Detalle de Oferta', 14, 16);
+    doc.setFontSize(11);
+    doc.text(`Titulo: ${oferta.titulo || '-'}`, 14, 24);
+    doc.text(`Empresa: ${oferta.empresa || '-'}`, 14, 30);
+    doc.text(`Sector: ${oferta.sector || '-'}`, 14, 36);
+    doc.text(`Modalidad: ${oferta.modalidad || '-'}`, 14, 42);
+    doc.text(`Contrato: ${(oferta.tipo_contrato || '-').replace('_', ' ')}`, 14, 48);
+    doc.text(`Vacantes: ${oferta.vacantes || 0}`, 14, 54);
+
+    const salarioTxt = oferta.salario_min && oferta.salario_max
+      ? `S/. ${parseInt(oferta.salario_min, 10).toLocaleString()} - ${parseInt(oferta.salario_max, 10).toLocaleString()}`
+      : 'A negociar';
+    doc.text(`Salario: ${salarioTxt}`, 14, 60);
+
+    autoTable(doc, {
+      startY: 68,
+      head: [['Seccion', 'Detalle']],
+      body: [
+        ['Descripcion', oferta.descripcion || '-'],
+        ['Requisitos', oferta.requisitos || '-'],
+        ['Beneficios', oferta.beneficios || '-'],
+      ],
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: { fillColor: [26, 54, 93] },
+    });
+
+    if (oferta.habilidades?.length) {
+      autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 8,
+        head: [['Habilidad', 'Tipo']],
+        body: oferta.habilidades.map((h) => [h.nombre, h.requerida ? 'Requerida' : 'Deseable']),
+        styles: { fontSize: 9 },
+        headStyles: { fillColor: [39, 103, 73] },
+      });
+    }
+
+    doc.save(`oferta_${(oferta.titulo || 'detalle').replace(/\s+/g, '_').toLowerCase()}.pdf`);
+  };
+
   const postular = async () => {
     setLoading(true); setMsg({ type:'', text:'' });
     try {
@@ -48,6 +94,7 @@ export default function DetalleOferta() {
       <nav style={s.nav}>
         <button style={s.back} onClick={() => navigate('/bolsa')}>← Volver</button>
         <span style={{ fontWeight:700, fontSize:16 }}>💼 SGE-UNT Bolsa Laboral</span>
+        <button style={s.pdf} onClick={descargarPdfOferta}>📄 Descargar PDF</button>
       </nav>
       <div style={s.body}>
         <div style={s.card}>

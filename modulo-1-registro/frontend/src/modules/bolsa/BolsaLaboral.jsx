@@ -1,44 +1,133 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import api from '../../services/api_bolsa';
 
 const s = {
   page: { minHeight:'100vh', background:'#f0f4f8' },
-  nav:  { background:'#1a365d', color:'#fff', padding:'14px 32px', display:'flex', justifyContent:'space-between', alignItems:'center' },
   body: { maxWidth:1100, margin:'0 auto', padding:'28px 16px' },
   filters: { background:'#fff', borderRadius:10, padding:20, marginBottom:24, display:'flex', gap:12, flexWrap:'wrap', alignItems:'flex-end', boxShadow:'0 1px 4px rgba(0,0,0,.06)' },
   input: { padding:'8px 12px', border:'1.5px solid #e2e8f0', borderRadius:7, fontSize:13, outline:'none', minWidth:140 },
-  btn: { padding:'8px 18px', background:'#276749', color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontSize:13, fontWeight:600 },
-  btnOutline: { padding:'8px 18px', background:'transparent', border:'1.5px solid #276749', color:'#276749', borderRadius:7, cursor:'pointer', fontSize:13, fontWeight:600 },
+  btn: { padding:'8px 18px', background:'#276749', color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontSize:13, fontWeight:700 },
+  btnOutline: { padding:'8px 18px', background:'#f8fafc', border:'1.5px solid #0f766e', color:'#0f766e', borderRadius:7, cursor:'pointer', fontSize:13, fontWeight:700 },
+  btnSecondary: { padding:'8px 18px', background:'#1d4ed8', color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontSize:13, fontWeight:700 },
+  btnPdf: { padding:'8px 18px', background:'#ef4444', color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontSize:13, fontWeight:800 },
+  btnAddSkill: { padding:'8px 18px', background:'#0891b2', color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontSize:13, fontWeight:700 },
   grid: { display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(320px,1fr))', gap:20 },
   card: { background:'#fff', borderRadius:12, padding:22, boxShadow:'0 2px 8px rgba(0,0,0,.06)', cursor:'pointer', transition:'transform .15s, box-shadow .15s', display:'flex', flexDirection:'column', gap:10 },
   badge: (c) => ({ display:'inline-block', padding:'3px 10px', borderRadius:20, fontSize:11, fontWeight:600, background:c+'22', color:c }),
-  logoutBtn: { background:'rgba(255,255,255,.15)', border:'none', color:'#fff', padding:'6px 14px', borderRadius:6, cursor:'pointer', fontSize:13 },
+  chip: { display:'inline-flex', alignItems:'center', gap:8, padding:'4px 10px', borderRadius:16, background:'#ebf8ff', color:'#2b6cb0', fontSize:12, fontWeight:600, border:'1px solid #bee3f8' },
+  chipClose: { border:'none', background:'transparent', color:'#2b6cb0', cursor:'pointer', fontSize:14, lineHeight:1 },
+  helperError: { width:'100%', fontSize:12, color:'#c53030', marginTop:2 },
+  matchesBox: { width:'100%', padding:'10px 12px', border:'1px dashed #cbd5e1', borderRadius:8, background:'#f8fafc', fontSize:12, color:'#334155' },
 };
 
 const modalidadColor = { presencial:'#276749', remoto:'#2d6a9f', hibrido:'#744210' };
+const contratoOpts = ['indefinido', 'plazo_fijo', 'practicas', 'services'];
 
 export default function BolsaLaboral() {
   const [ofertas, setOfertas] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filtros, setFiltros] = useState({ modalidad:'', sector:'', salario_min:'', salario_max:'', habilidad:'' });
+  const [filtros, setFiltros] = useState({ modalidad:'', sector:'', salario_min:'', salario_max:'', tipo_contrato:'' });
+  const [sectores, setSectores] = useState([]);
+  const [habilidadesCatalogo, setHabilidadesCatalogo] = useState([]);
+  const [habilidadesSeleccionadas, setHabilidadesSeleccionadas] = useState([]);
+  const [habilidadInput, setHabilidadInput] = useState('');
+  const [skillMatches, setSkillMatches] = useState({});
+  const [exportingPdf, setExportingPdf] = useState(false);
   const [pagination, setPagination] = useState(null);
   const [page, setPage] = useState(1);
   const [recomendadas, setRecomendadas] = useState([]);
   const user = JSON.parse(localStorage.getItem('sge_user') || '{}');
   const navigate = useNavigate();
 
-  useEffect(() => { cargarOfertas(); }, [page, filtros]);
+  const salarioMinNum = filtros.salario_min !== '' ? Number(filtros.salario_min) : null;
+  const salarioMaxNum = filtros.salario_max !== '' ? Number(filtros.salario_max) : null;
+  const salarioInvalido = useMemo(() => (
+    salarioMinNum !== null && salarioMaxNum !== null && salarioMinNum > salarioMaxNum
+  ), [salarioMinNum, salarioMaxNum]);
+
+  const filtrosNormalizados = useMemo(() => {
+    let min = filtros.salario_min;
+    let max = filtros.salario_max;
+    if (salarioInvalido) {
+      min = String(salarioMaxNum);
+      max = String(salarioMinNum);
+    }
+    return {
+      ...filtros,
+      salario_min: min,
+      salario_max: max,
+    };
+  }, [filtros, salarioInvalido, salarioMinNum, salarioMaxNum]);
+
+  const buildParams = (nextPage = page, nextLimit = 9, opts = {}) => {
+    const { includeSelectedSkills = true, singleSkill = '' } = opts;
+    const paramsObj = {
+      page: nextPage,
+      limit: nextLimit,
+      ...Object.fromEntries(Object.entries(filtrosNormalizados).filter(([, v]) => v !== '')),
+    };
+    if (singleSkill) {
+      paramsObj.habilidad = singleSkill;
+    } else if (includeSelectedSkills && habilidadesSeleccionadas.length > 0) {
+      paramsObj.habilidades = habilidadesSeleccionadas.join(',');
+    }
+    return new URLSearchParams(paramsObj);
+  };
+
+  useEffect(() => { cargarOfertas(); }, [page, filtrosNormalizados, habilidadesSeleccionadas]);
+
+  useEffect(() => {
+    const cargarCatalogos = async () => {
+      try {
+        const [resSectores, resHabilidades] = await Promise.all([
+          api.get('/api/ofertas/sectores'),
+          api.get('/api/ofertas/habilidades'),
+        ]);
+        setSectores(resSectores.data.data || []);
+        setHabilidadesCatalogo((resHabilidades.data.data || []).map((h) => h.nombre));
+      } catch (_) {
+        setSectores([]);
+        setHabilidadesCatalogo([]);
+      }
+    };
+    cargarCatalogos();
+  }, []);
+
   useEffect(() => {
     if (user.rol === 'egresado') {
       api.get('/api/match/recomendaciones').then(r => setRecomendadas(r.data.data || [])).catch(() => {});
     }
   }, []);
 
+  useEffect(() => {
+    const calcularCoincidencias = async () => {
+      if (!habilidadesSeleccionadas.length) {
+        setSkillMatches({});
+        return;
+      }
+      try {
+        const resultados = await Promise.all(
+          habilidadesSeleccionadas.map(async (skill) => {
+            const params = buildParams(1, 1, { includeSelectedSkills: false, singleSkill: skill });
+            const r = await api.get(`/api/ofertas?${params}`);
+            return [skill, r.data?.pagination?.total || 0];
+          })
+        );
+        setSkillMatches(Object.fromEntries(resultados));
+      } catch (_) {
+        setSkillMatches({});
+      }
+    };
+    calcularCoincidencias();
+  }, [habilidadesSeleccionadas, filtrosNormalizados]);
+
   const cargarOfertas = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page, limit:9, ...Object.fromEntries(Object.entries(filtros).filter(([,v])=>v!=='')) });
+      const params = buildParams(page, 9);
       const r = await api.get(`/api/ofertas?${params}`);
       setOfertas(r.data.data || []);
       setPagination(r.data.pagination);
@@ -46,7 +135,64 @@ export default function BolsaLaboral() {
     setLoading(false);
   };
 
-  const logout = () => { localStorage.removeItem('sge_token'); localStorage.removeItem('sge_user'); navigate('/login'); };
+  const agregarHabilidad = (habilidad) => {
+    const normalized = (habilidad || '').trim();
+    if (!normalized) return;
+    const exists = habilidadesSeleccionadas.some((h) => h.toLowerCase() === normalized.toLowerCase());
+    if (exists) return;
+    setHabilidadesSeleccionadas((prev) => [...prev, normalized]);
+    setHabilidadInput('');
+    setPage(1);
+  };
+
+  const quitarHabilidad = (habilidad) => {
+    setHabilidadesSeleccionadas((prev) => prev.filter((h) => h !== habilidad));
+    setPage(1);
+  };
+
+  const exportarOfertasPdf = async () => {
+    setExportingPdf(true);
+    try {
+      const params = buildParams(1, 500);
+      const r = await api.get(`/api/ofertas?${params}`);
+      const data = r.data.data || [];
+
+      const doc = new jsPDF();
+      doc.setFontSize(16);
+      doc.text('SGE-UNT | Bolsa Laboral', 14, 16);
+      doc.setFontSize(10);
+      doc.text(`Generado: ${new Date().toLocaleString('es-PE')}`, 14, 22);
+      doc.text(`Ofertas incluidas: ${data.length}`, 14, 27);
+
+      autoTable(doc, {
+        startY: 32,
+        head: [['Titulo', 'Empresa', 'Sector', 'Modalidad', 'Contrato', 'Salario', 'Vacantes']],
+        body: data.map((o) => {
+          const salario = o.salario_min && o.salario_max
+            ? `S/. ${Number(o.salario_min).toFixed(0)} - ${Number(o.salario_max).toFixed(0)}`
+            : o.salario_min
+              ? `S/. ${Number(o.salario_min).toFixed(0)}+`
+              : 'A negociar';
+          return [
+            o.titulo,
+            o.empresa || '-',
+            o.sector || '-',
+            o.modalidad || '-',
+            (o.tipo_contrato || '-').replace('_', ' '),
+            salario,
+            String(o.vacantes || 0),
+          ];
+        }),
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [26, 54, 93] },
+        alternateRowStyles: { fillColor: [245, 248, 252] },
+      });
+
+      doc.save('ofertas_sge_unt.pdf');
+    } finally {
+      setExportingPdf(false);
+    }
+  };
 
   return (
     <div style={s.page}>
@@ -88,7 +234,17 @@ export default function BolsaLaboral() {
           </div>
           <div>
             <div style={{ fontSize:11, fontWeight:600, color:'#718096', marginBottom:4 }}>SECTOR</div>
-            <input style={s.input} placeholder="Buscar sector..." value={filtros.sector} onChange={e=>{ setFiltros({...filtros,sector:e.target.value}); setPage(1); }} />
+            <select style={s.input} value={filtros.sector} onChange={e=>{ setFiltros({...filtros,sector:e.target.value}); setPage(1); }}>
+              <option value="">Todos</option>
+              {sectores.map((sector) => <option key={sector} value={sector}>{sector}</option>)}
+            </select>
+          </div>
+          <div>
+            <div style={{ fontSize:11, fontWeight:600, color:'#718096', marginBottom:4 }}>CONTRATO</div>
+            <select style={s.input} value={filtros.tipo_contrato} onChange={e=>{ setFiltros({...filtros,tipo_contrato:e.target.value}); setPage(1); }}>
+              <option value="">Todos</option>
+              {contratoOpts.map((tipo) => <option key={tipo} value={tipo}>{tipo.replace('_', ' ')}</option>)}
+            </select>
           </div>
           <div>
             <div style={{ fontSize:11, fontWeight:600, color:'#718096', marginBottom:4 }}>SALARIO MINIMO</div>
@@ -99,12 +255,54 @@ export default function BolsaLaboral() {
             <input style={s.input} type="number" min="0" placeholder="Hasta" value={filtros.salario_max} onChange={e=>{ setFiltros({...filtros,salario_max:e.target.value}); setPage(1); }} />
           </div>
           <div>
-            <div style={{ fontSize:11, fontWeight:600, color:'#718096', marginBottom:4 }}>HABILIDAD</div>
-            <input style={s.input} placeholder="Ej: React" value={filtros.habilidad} onChange={e=>{ setFiltros({...filtros,habilidad:e.target.value}); setPage(1); }} />
+            <div style={{ fontSize:11, fontWeight:600, color:'#718096', marginBottom:4 }}>HABILIDADES</div>
+            <div style={{ display:'flex', gap:8 }}>
+              <input
+                style={s.input}
+                list="skills-list"
+                placeholder="Ej: React"
+                value={habilidadInput}
+                onChange={(e)=>setHabilidadInput(e.target.value)}
+                onKeyDown={(e)=>{ if (e.key === 'Enter') { e.preventDefault(); agregarHabilidad(habilidadInput); } }}
+              />
+              <datalist id="skills-list">
+                {habilidadesCatalogo
+                  .filter((h) => !habilidadesSeleccionadas.some((x) => x.toLowerCase() === h.toLowerCase()))
+                  .map((h) => <option key={h} value={h} />)}
+              </datalist>
+              <button style={s.btnAddSkill} onClick={() => agregarHabilidad(habilidadInput)}>➕ Agregar</button>
+            </div>
           </div>
-          <button style={s.btnOutline} onClick={() => { setFiltros({ modalidad:'', sector:'', salario_min:'', salario_max:'', habilidad:'' }); setPage(1); }}>Limpiar</button>
-          {user.rol === 'empresa' && (
-            <button style={{ ...s.btn, marginLeft:'auto' }} onClick={() => navigate('/bolsa/empresa/oferta/nueva')}>+ Nueva Oferta</button>
+
+          <div style={{ marginLeft:'auto', display:'flex', gap:8, flexWrap:'wrap' }}>
+            <button style={s.btnOutline} onClick={() => { setFiltros({ modalidad:'', sector:'', salario_min:'', salario_max:'', tipo_contrato:'' }); setHabilidadesSeleccionadas([]); setHabilidadInput(''); setPage(1); }}>🧹 Limpiar</button>
+            <button style={s.btnPdf} onClick={exportarOfertasPdf} disabled={exportingPdf}>{exportingPdf ? '⏳ Generando PDF...' : '📄 Descargar PDF'}</button>
+            {user.rol === 'empresa' && (
+              <button style={s.btn} onClick={() => navigate('/bolsa/empresa/oferta/nueva')}>🏢 + Nueva Oferta</button>
+            )}
+          </div>
+
+          {salarioInvalido && <div style={s.helperError}>Se detecto un rango invertido. El sistema lo corrige automaticamente para filtrar.</div>}
+          {habilidadesSeleccionadas.length > 0 && (
+            <div style={{ width:'100%', display:'grid', gap:10, marginTop:4 }}>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+                {habilidadesSeleccionadas.map((h) => (
+                  <span key={h} style={s.chip}>
+                    {h}
+                    <button style={s.chipClose} onClick={() => quitarHabilidad(h)} aria-label={`Quitar ${h}`}>x</button>
+                  </span>
+                ))}
+              </div>
+              <div style={s.matchesBox}>
+                <div style={{ fontWeight:700, marginBottom:6 }}>Coincidencias:</div>
+                {habilidadesSeleccionadas.map((h) => (
+                  <div key={`match-${h}`} style={{ display:'flex', justifyContent:'space-between', maxWidth:260 }}>
+                    <span>{h}</span>
+                    <span style={{ fontWeight:700 }}>({skillMatches[h] ?? 0})</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
 
