@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
@@ -18,15 +18,42 @@ const s = {
 
 export default function CrearOferta() {
   const [form, setForm] = useState({ titulo:'', descripcion:'', requisitos:'', beneficios:'', salario_min:'', salario_max:'', modalidad:'presencial', tipo_contrato:'indefinido', vacantes:1 });
+  const [habilidades, setHabilidades] = useState([]);
+  const [selected, setSelected] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const set = (k,v) => setForm(f => ({...f,[k]:v}));
 
+  useEffect(() => {
+    api.get('/api/ofertas/habilidades')
+      .then((r) => setHabilidades(r.data.data || []))
+      .catch(() => {});
+  }, []);
+
+  const toggleHabilidad = (id) => {
+    setSelected((prev) => {
+      if (prev[id]) {
+        const clone = { ...prev };
+        delete clone[id];
+        return clone;
+      }
+      return { ...prev, [id]: true };
+    });
+  };
+
+  const setRequired = (id, required) => {
+    setSelected((prev) => ({ ...prev, [id]: required }));
+  };
+
   const handleSubmit = async e => {
     e.preventDefault(); setError(''); setLoading(true);
     try {
-      await api.post('/api/ofertas', form);
+      const payload = {
+        ...form,
+        habilidades: Object.entries(selected).map(([id_habilidad, requerida]) => ({ id_habilidad, requerida })),
+      };
+      await api.post('/api/ofertas', payload);
       navigate('/empresa/dashboard');
     } catch(e) { setError(e.response?.data?.message || 'Error al crear oferta'); }
     setLoading(false);
@@ -68,6 +95,28 @@ export default function CrearOferta() {
               </div>
               <div><label style={s.label}>Vacantes</label><input style={s.input} type="number" min={1} value={form.vacantes} onChange={e=>set('vacantes',e.target.value)} /></div>
               <div><label style={s.label}>Fecha de Cierre</label><input style={s.input} type="date" value={form.fecha_cierre||''} onChange={e=>set('fecha_cierre',e.target.value)} /></div>
+            </div>
+
+            <label style={s.label}>Habilidades Requeridas / Opcionales</label>
+            <div style={{ border:'1.5px solid #e2e8f0', borderRadius:8, padding:12, maxHeight:180, overflowY:'auto' }}>
+              {!habilidades.length && <div style={{ color:'#a0aec0', fontSize:12 }}>Sin habilidades disponibles</div>}
+              {habilidades.map((h) => {
+                const active = Object.prototype.hasOwnProperty.call(selected, h.id_habilidad);
+                return (
+                  <div key={h.id_habilidad} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, padding:'6px 0' }}>
+                    <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, color:'#2d3748' }}>
+                      <input type="checkbox" checked={active} onChange={() => toggleHabilidad(h.id_habilidad)} />
+                      <span>{h.nombre}</span>
+                    </label>
+                    {active && (
+                      <select style={{ ...s.select, width:130, padding:'6px 8px' }} value={selected[h.id_habilidad] ? 'true' : 'false'} onChange={(e) => setRequired(h.id_habilidad, e.target.value === 'true')}>
+                        <option value="true">Requerida</option>
+                        <option value="false">Opcional</option>
+                      </select>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             {error && <div style={s.err}>⚠️ {error}</div>}

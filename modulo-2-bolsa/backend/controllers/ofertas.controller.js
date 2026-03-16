@@ -1,18 +1,48 @@
 const db = require('../config/database');
 const { success, error, paginate } = require('../../../shared/utils/response');
+const { calculateMatchScore } = require('../services/matching.service');
 
 // GET /api/ofertas
 exports.getAll = async (req, res, next) => {
   try {
-    const { page = 1, limit = 10, modalidad, sector, salario_min } = req.query;
+    const page = Math.max(parseInt(req.query.page || 1, 10), 1);
+    const limit = Math.max(parseInt(req.query.limit || 10, 10), 1);
     const offset = (page - 1) * limit;
-    const cond = ['o.estado = \'activa\''];
+    const { modalidad, sector, salario_min, salario_max, habilidad, estado, mine } = req.query;
+
+    const cond = [];
     const params = [];
     let idx = 1;
+
+    const verSoloActivas = !(req.user?.rol === 'empresa' && mine === 'true') && req.user?.rol !== 'admin';
+    if (verSoloActivas) {
+      cond.push(`o.estado = 'activa'`);
+    } else if (estado && estado !== 'todas') {
+      cond.push(`o.estado = $${idx++}`);
+      params.push(estado);
+    }
+
+    if (req.user?.rol === 'empresa' && mine === 'true') {
+      cond.push(`o.id_empresa = $${idx++}`);
+      params.push(req.user.id_empresa);
+    }
+
     if (modalidad) { cond.push(`o.modalidad = $${idx++}`); params.push(modalidad); }
     if (sector)    { cond.push(`emp.sector ILIKE $${idx++}`); params.push(`%${sector}%`); }
-    if (salario_min) { cond.push(`o.salario_min >= $${idx++}`); params.push(salario_min); }
-    const where = 'WHERE ' + cond.join(' AND ');
+    if (salario_min) { cond.push(`COALESCE(o.salario_max, o.salario_min, 0) >= $${idx++}`); params.push(Number(salario_min)); }
+    if (salario_max) { cond.push(`COALESCE(o.salario_min, o.salario_max, 0) <= $${idx++}`); params.push(Number(salario_max)); }
+    if (habilidad) {
+      cond.push(`EXISTS (
+        SELECT 1
+        FROM bolsa_laboral.oferta_habilidades oh
+        JOIN egresados_unt.habilidades h ON h.id_habilidad = oh.id_habilidad
+        WHERE oh.id_oferta = o.id_oferta
+          AND h.nombre ILIKE $${idx++}
+      )`);
+      params.push(`%${habilidad}%`);
+    }
+
+    const where = cond.length ? `WHERE ${cond.join(' AND ')}` : '';
     const cnt = await db.query(`SELECT COUNT(*) FROM bolsa_laboral.ofertas_laborales o JOIN bolsa_laboral.empresas emp ON emp.id_empresa=o.id_empresa ${where}`, params);
     const rows = await db.query(
       `SELECT o.id_oferta, o.titulo, o.descripcion, o.modalidad, o.tipo_contrato,
@@ -24,7 +54,18 @@ exports.getAll = async (req, res, next) => {
        ${where} ORDER BY o.fecha_publicacion DESC LIMIT $${idx} OFFSET $${idx+1}`,
       [...params, limit, offset]
     );
-    success(res, rows.rows, 'Ofertas obtenidas', 200, paginate(page, limit, parseInt(cnt.rows[0].count)));
+
+    let data = rows.rows;
+    if (req.user?.rol === 'egresado' && req.user.id_egresado) {
+      data = await Promise.all(
+        rows.rows.map(async (o) => ({
+          ...o,
+          puntaje_match: await calculateMatchScore(req.user.id_egresado, o.id_oferta),
+        }))
+      );
+    }
+
+    success(res, data, 'Ofertas obtenidas', 200, paginate(page, limit, parseInt(cnt.rows[0].count, 10)));
   } catch (e) { next(e); }
 };
 
@@ -47,14 +88,30 @@ exports.getById = async (req, res, next) => {
        WHERE oh.id_oferta=$1`, [req.params.id]
     );
     oferta.habilidades = habs.rows;
+    if (req.user?.rol === 'egresado' && req.user.id_egresado) {
+      oferta.puntaje_match = await calculateMatchScore(req.user.id_egresado, req.params.id);
+    }
     success(res, oferta);
+  } catch (e) { next(e); }
+};
+
+// GET /api/ofertas/habilidades
+exports.getHabilidades = async (req, res, next) => {
+  try {
+    const r = await db.query(
+      `SELECT id_habilidad, nombre, categoria
+       FROM egresados_unt.habilidades
+       WHERE estado = TRUE
+       ORDER BY nombre`
+    );
+    success(res, r.rows);
   } catch (e) { next(e); }
 };
 
 // POST /api/ofertas
 exports.create = async (req, res, next) => {
   try {
-    if (req.user.rol !== 'empresa' && req.user.rol !== 'admin') return error(res, 'Solo empresas pueden crear ofertas', 403);
+    if (req.user.rol !== 'empresa') return error(res, 'Solo empresa autenticada puede crear ofertas', 403);
     const { titulo, descripcion, requisitos, beneficios, salario_min, salario_max, modalidad, tipo_contrato, fecha_cierre, vacantes, habilidades } = req.body;
     if (!titulo || !descripcion) return error(res, 'titulo y descripcion son requeridos', 400);
     const r = await db.query(
@@ -77,7 +134,7 @@ exports.update = async (req, res, next) => {
   try {
     const oferta = await db.query('SELECT id_empresa FROM bolsa_laboral.ofertas_laborales WHERE id_oferta=$1', [req.params.id]);
     if (!oferta.rows.length) return error(res, 'Oferta no encontrada', 404);
-    if (req.user.rol !== 'admin' && oferta.rows[0].id_empresa !== req.user.id_empresa) return error(res, 'Sin permiso', 403);
+    if (req.user.rol !== 'empresa' || oferta.rows[0].id_empresa !== req.user.id_empresa) return error(res, 'Sin permiso', 403);
     const { titulo, descripcion, requisitos, salario_min, salario_max, modalidad, vacantes, estado } = req.body;
     await db.query(
       `UPDATE bolsa_laboral.ofertas_laborales SET titulo=COALESCE($1,titulo), descripcion=COALESCE($2,descripcion),
@@ -92,6 +149,9 @@ exports.update = async (req, res, next) => {
 // DELETE /api/ofertas/:id/cerrar
 exports.cerrar = async (req, res, next) => {
   try {
+    const oferta = await db.query('SELECT id_empresa FROM bolsa_laboral.ofertas_laborales WHERE id_oferta=$1', [req.params.id]);
+    if (!oferta.rows.length) return error(res, 'Oferta no encontrada', 404);
+    if (req.user.rol !== 'empresa' || oferta.rows[0].id_empresa !== req.user.id_empresa) return error(res, 'Sin permiso', 403);
     await db.query("UPDATE bolsa_laboral.ofertas_laborales SET estado='cerrada' WHERE id_oferta=$1", [req.params.id]);
     success(res, null, 'Oferta cerrada');
   } catch (e) { next(e); }

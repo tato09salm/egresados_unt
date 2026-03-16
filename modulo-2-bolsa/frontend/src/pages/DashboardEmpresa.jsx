@@ -23,14 +23,13 @@ export default function DashboardEmpresa() {
   const [ofertas, setOfertas] = useState([]);
   const [ofertaId, setOfertaId] = useState('');
   const [postulantes, setPostulantes] = useState([]);
-  const user = JSON.parse(localStorage.getItem('sge_user') || '{}');
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.get('/api/ofertas?limit=50').then(r => {
-      const mis = r.data.data?.filter(o => true) || []; // empresa ve todas sus ofertas
-      setOfertas(r.data.data || []);
-      if (r.data.data?.[0]) { setOfertaId(r.data.data[0].id_oferta); }
+    api.get('/api/ofertas?mine=true&estado=todas&limit=100').then(r => {
+      const mis = r.data.data || [];
+      setOfertas(mis);
+      if (mis[0]) { setOfertaId(mis[0].id_oferta); }
     }).catch(() => navigate('/login'));
   }, []);
 
@@ -79,10 +78,10 @@ export default function DashboardEmpresa() {
                   <div style={{ color:'#718096', fontSize:11, marginTop:2 }}>{p.escuela}</div>
                   {p.puntaje_match && <div style={{ color:'#276749', fontWeight:700, fontSize:14, marginTop:4 }}>{p.puntaje_match}% match</div>}
                   <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:10 }}>
-                    {estado !== 'revision'    && <button style={s.btn('#d69e2e')} onClick={() => cambiarEstado(p.id_postulacion,'revision')}>→ Revisión</button>}
-                    {estado === 'revision'    && <button style={s.btn('#2d6a9f')} onClick={() => cambiarEstado(p.id_postulacion,'entrevista')}>→ Entrevista</button>}
-                    {estado === 'entrevista'  && <button style={s.btn('#276749')} onClick={() => cambiarEstado(p.id_postulacion,'aceptado')}>✓ Aceptar</button>}
-                    {!['aceptado','rechazado'].includes(estado) && <button style={s.btn('#e53e3e')} onClick={() => cambiarEstado(p.id_postulacion,'rechazado')}>✗ Rechazar</button>}
+                    {estado === 'pendiente' && <button style={s.btn('#d69e2e')} onClick={() => cambiarEstado(p.id_postulacion,'revision')}>→ Revisión</button>}
+                    {estado === 'revision' && <button style={s.btn('#2d6a9f')} onClick={() => cambiarEstado(p.id_postulacion,'entrevista')}>→ Entrevista</button>}
+                    {estado === 'entrevista' && <button style={s.btn('#276749')} onClick={() => cambiarEstado(p.id_postulacion,'aceptado')}>✓ Aceptar</button>}
+                    {estado === 'entrevista' && <button style={s.btn('#e53e3e')} onClick={() => cambiarEstado(p.id_postulacion,'rechazado')}>✗ Rechazar</button>}
                   </div>
                 </div>
               ))}

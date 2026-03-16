@@ -23,12 +23,10 @@ export default function DashboardEmpresa() {
   const [ofertas, setOfertas] = useState([]);
   const [ofertaId, setOfertaId] = useState('');
   const [postulantes, setPostulantes] = useState([]);
-  const user = JSON.parse(localStorage.getItem('sge_user') || '{}');
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.get('/api/bolsa?limit=50').then(r => {
-      const mis = r.data.data?.filter(o => true) || []; // empresa ve todas sus ofertas
+    api.get('/api/ofertas?mine=true&limit=50').then(r => {
       setOfertas(r.data.data || []);
       if (r.data.data?.[0]) { setOfertaId(r.data.data[0].id_oferta); }
     }).catch(() => navigate('/login'));
@@ -36,19 +34,29 @@ export default function DashboardEmpresa() {
 
   useEffect(() => {
     if (!ofertaId) return;
-    api.get(`/api/bolsa/postulaciones/oferta/${ofertaId}?limit=100`)
+    api.get(`/api/postulaciones/oferta/${ofertaId}?limit=100`)
       .then(r => setPostulantes(r.data.data || []))
       .catch(() => {});
   }, [ofertaId]);
 
   const cambiarEstado = async (id_postulacion, estado) => {
-    await api.put(`/api/bolsa/postulaciones/${id_postulacion}/estado`, { estado });
+    await api.put(`/api/postulaciones/${id_postulacion}/estado`, { estado });
     setPostulantes(ps => ps.map(p => p.id_postulacion === id_postulacion ? { ...p, estado } : p));
   };
 
   const logout = () => { localStorage.removeItem('sge_token'); localStorage.removeItem('sge_user'); navigate('/login'); };
 
   const byEstado = (e) => postulantes.filter(p => p.estado === e);
+
+  const actionsForState = (estado) => {
+    if (estado === 'pendiente') return [{ to:'revision', label:'→ Revisión', color:'#d69e2e' }];
+    if (estado === 'revision') return [{ to:'entrevista', label:'→ Entrevista', color:'#2d6a9f' }];
+    if (estado === 'entrevista') return [
+      { to:'aceptado', label:'✓ Aceptar', color:'#276749' },
+      { to:'rechazado', label:'✗ Rechazar', color:'#e53e3e' },
+    ];
+    return [];
+  };
 
   return (
     <div style={s.page}>
@@ -63,6 +71,7 @@ export default function DashboardEmpresa() {
         <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:20 }}>
           <span style={{ fontSize:14, fontWeight:600, color:'#4a5568' }}>Oferta:</span>
           <select style={s.select} value={ofertaId} onChange={e => setOfertaId(e.target.value)}>
+            {!ofertas.length && <option value="">Sin ofertas publicadas</option>}
             {ofertas.map(o => <option key={o.id_oferta} value={o.id_oferta}>{o.titulo} ({o.total_postulantes || 0} postulantes)</option>)}
           </select>
         </div>
@@ -79,10 +88,9 @@ export default function DashboardEmpresa() {
                   <div style={{ color:'#718096', fontSize:11, marginTop:2 }}>{p.escuela}</div>
                   {p.puntaje_match && <div style={{ color:'#276749', fontWeight:700, fontSize:14, marginTop:4 }}>{p.puntaje_match}% match</div>}
                   <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:10 }}>
-                    {estado !== 'revision'    && <button style={s.btn('#d69e2e')} onClick={() => cambiarEstado(p.id_postulacion,'revision')}>→ Revisión</button>}
-                    {estado === 'revision'    && <button style={s.btn('#2d6a9f')} onClick={() => cambiarEstado(p.id_postulacion,'entrevista')}>→ Entrevista</button>}
-                    {estado === 'entrevista'  && <button style={s.btn('#276749')} onClick={() => cambiarEstado(p.id_postulacion,'aceptado')}>✓ Aceptar</button>}
-                    {!['aceptado','rechazado'].includes(estado) && <button style={s.btn('#e53e3e')} onClick={() => cambiarEstado(p.id_postulacion,'rechazado')}>✗ Rechazar</button>}
+                    {actionsForState(estado).map((a) => (
+                      <button key={a.to} style={s.btn(a.color)} onClick={() => cambiarEstado(p.id_postulacion, a.to)}>{a.label}</button>
+                    ))}
                   </div>
                 </div>
               ))}

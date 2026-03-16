@@ -13,6 +13,7 @@ const s = {
 
 const estadoColor = { pendiente:'#718096', revision:'#d69e2e', entrevista:'#2d6a9f', aceptado:'#276749', rechazado:'#e53e3e' };
 const estadoLabel = { pendiente:'Pendiente', revision:'En Revisión', entrevista:'Entrevista', aceptado:'Aceptado ✓', rechazado:'Rechazado' };
+const lineaEstados = ['pendiente','revision','entrevista','aceptado'];
 
 export default function MisPostulaciones() {
   const [posts, setPosts] = useState([]);
@@ -50,20 +51,22 @@ export default function MisPostulaciones() {
             </div>
             {/* Timeline de estados */}
             <div style={{ display:'flex', marginTop:16, gap:0 }}>
-              {['pendiente','revision','entrevista','aceptado'].map((e,i) => {
-                const ord = ['pendiente','revision','entrevista','aceptado','rechazado'];
-                const active = ord.indexOf(p.estado) >= ord.indexOf(e);
+              {lineaEstados.map((e,i) => {
+                const active = p.estado === 'rechazado' ? i <= 2 : lineaEstados.indexOf(p.estado) >= i;
                 return (
                   <React.Fragment key={e}>
                     <div style={{ display:'flex', flexDirection:'column', alignItems:'center', flex:1 }}>
-                      <div style={{ width:16, height:16, borderRadius:'50%', background: active ? '#276749' : '#e2e8f0', border:'2px solid', borderColor: active ? '#276749' : '#e2e8f0' }} />
-                      <div style={{ fontSize:10, color: active ? '#276749' : '#a0aec0', marginTop:4, textAlign:'center' }}>{estadoLabel[e]}</div>
+                      <div style={{ width:16, height:16, borderRadius:'50%', background: active ? (p.estado === 'rechazado' ? '#e53e3e' : '#276749') : '#e2e8f0', border:'2px solid', borderColor: active ? (p.estado === 'rechazado' ? '#e53e3e' : '#276749') : '#e2e8f0' }} />
+                      <div style={{ fontSize:10, color: active ? (p.estado === 'rechazado' ? '#e53e3e' : '#276749') : '#a0aec0', marginTop:4, textAlign:'center' }}>{estadoLabel[e]}</div>
                     </div>
-                    {i < 3 && <div style={{ height:2, background: active && ord.indexOf(p.estado) > i ? '#276749' : '#e2e8f0', flex:1, marginTop:7 }} />}
+                    {i < 3 && <div style={{ height:2, background: active && ((p.estado === 'rechazado' && i < 2) || (p.estado !== 'rechazado' && lineaEstados.indexOf(p.estado) > i)) ? (p.estado === 'rechazado' ? '#e53e3e' : '#276749') : '#e2e8f0', flex:1, marginTop:7 }} />}
                   </React.Fragment>
                 );
               })}
             </div>
+            {p.estado === 'rechazado' && (
+              <div style={{ marginTop:10, fontSize:11, fontWeight:600, color:'#e53e3e' }}>Proceso finalizado en Rechazado</div>
+            )}
           </div>
          ))
         }

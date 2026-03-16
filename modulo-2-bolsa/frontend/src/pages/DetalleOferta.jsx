@@ -56,6 +56,7 @@ export default function DetalleOferta() {
             <span style={s.badge('#276749')}>{oferta.modalidad}</span>
             <span style={s.badge('#2d6a9f')}>{oferta.tipo_contrato?.replace('_',' ')}</span>
             {oferta.verificada && <span style={s.badge('#744210')}>✓ Empresa Verificada</span>}
+            {typeof oferta.puntaje_compatibilidad === 'number' && <span style={s.badge('#2b6cb0')}>🎯 {oferta.puntaje_compatibilidad}% compatibilidad</span>}
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:20 }}>
             <div><div style={{ fontSize:11, fontWeight:600, color:'#a0aec0' }}>EMPRESA</div><div style={{ fontSize:14, fontWeight:600 }}>{oferta.empresa}</div><div style={{ fontSize:12, color:'#718096' }}>{oferta.sector}</div></div>

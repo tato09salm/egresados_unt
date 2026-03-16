@@ -20,7 +20,7 @@ export default function MisPostulaciones() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.get('/api/bolsa/postulaciones/mis-postulaciones')
+    api.get('/api/postulaciones/mis-postulaciones')
       .then(r => setPosts(r.data.data || []))
       .catch(() => navigate('/login'))
       .finally(() => setLoading(false));
@@ -36,7 +36,7 @@ export default function MisPostulaciones() {
         {loading ? <div style={{ textAlign:'center', padding:60 }}>Cargando...</div> :
          posts.length === 0 ? <div style={{ textAlign:'center', padding:60, color:'#a0aec0' }}>Aún no tienes postulaciones</div> :
          posts.map(p => (
-          <div key={p.id_postulacion} style={s.card} onClick={() => navigate(`/bolsa/${p.id_oferta}`)}>
+          <div key={p.id_postulacion} style={s.card} onClick={() => navigate(`/bolsa/ofertas/${p.id_oferta}`)}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
               <div>
                 <div style={{ fontWeight:700, fontSize:15, color:'#1a365d' }}>{p.titulo}</div>
@@ -50,7 +50,7 @@ export default function MisPostulaciones() {
             </div>
             {/* Timeline de estados */}
             <div style={{ display:'flex', marginTop:16, gap:0 }}>
-              {['pendiente','revision','entrevista','aceptado'].map((e,i) => {
+              {['pendiente','revision','entrevista', p.estado === 'rechazado' ? 'rechazado' : 'aceptado'].map((e,i) => {
                 const ord = ['pendiente','revision','entrevista','aceptado','rechazado'];
                 const active = ord.indexOf(p.estado) >= ord.indexOf(e);
                 return (

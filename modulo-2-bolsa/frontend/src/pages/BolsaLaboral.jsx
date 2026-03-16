@@ -21,7 +21,7 @@ const modalidadColor = { presencial:'#276749', remoto:'#2d6a9f', hibrido:'#74421
 export default function BolsaLaboral() {
   const [ofertas, setOfertas] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filtros, setFiltros] = useState({ modalidad:'', sector:'' });
+  const [filtros, setFiltros] = useState({ modalidad:'', sector:'', salario_min:'', salario_max:'', habilidad:'' });
   const [pagination, setPagination] = useState(null);
   const [page, setPage] = useState(1);
   const [recomendadas, setRecomendadas] = useState([]);
@@ -93,7 +93,19 @@ export default function BolsaLaboral() {
             <div style={{ fontSize:11, fontWeight:600, color:'#718096', marginBottom:4 }}>SECTOR</div>
             <input style={s.input} placeholder="Buscar sector..." value={filtros.sector} onChange={e=>{ setFiltros({...filtros,sector:e.target.value}); setPage(1); }} />
           </div>
-          <button style={s.btnOutline} onClick={() => { setFiltros({ modalidad:'', sector:'' }); setPage(1); }}>Limpiar</button>
+          <div>
+            <div style={{ fontSize:11, fontWeight:600, color:'#718096', marginBottom:4 }}>SALARIO MÍNIMO</div>
+            <input style={s.input} type="number" placeholder="S/." value={filtros.salario_min} onChange={e=>{ setFiltros({...filtros,salario_min:e.target.value}); setPage(1); }} />
+          </div>
+          <div>
+            <div style={{ fontSize:11, fontWeight:600, color:'#718096', marginBottom:4 }}>SALARIO MÁXIMO</div>
+            <input style={s.input} type="number" placeholder="S/." value={filtros.salario_max} onChange={e=>{ setFiltros({...filtros,salario_max:e.target.value}); setPage(1); }} />
+          </div>
+          <div>
+            <div style={{ fontSize:11, fontWeight:600, color:'#718096', marginBottom:4 }}>HABILIDAD</div>
+            <input style={s.input} placeholder="Ej: React, Python" value={filtros.habilidad} onChange={e=>{ setFiltros({...filtros,habilidad:e.target.value}); setPage(1); }} />
+          </div>
+          <button style={s.btnOutline} onClick={() => { setFiltros({ modalidad:'', sector:'', salario_min:'', salario_max:'', habilidad:'' }); setPage(1); }}>Limpiar</button>
           {user.rol === 'empresa' && (
             <button style={{ ...s.btn, marginLeft:'auto' }} onClick={() => navigate('/empresa/oferta/nueva')}>+ Nueva Oferta</button>
           )}
@@ -118,6 +130,12 @@ export default function BolsaLaboral() {
                     <span style={s.badge(modalidadColor[o.modalidad] || '#718096')}>{o.modalidad}</span>
                   </div>
                   <div style={{ fontSize:13, color:'#718096' }}>🏢 {o.empresa}</div>
+                  {user.rol === 'egresado' && Number.isFinite(Number(o.puntaje_match)) && (
+                    <div style={{ display:'flex', alignItems:'baseline', gap:8 }}>
+                      <span style={{ fontSize:22, fontWeight:700, color:'#276749' }}>{Math.round(Number(o.puntaje_match))}%</span>
+                      <span style={{ fontSize:11, color:'#718096' }}>compatibilidad</span>
+                    </div>
+                  )}
                   {o.sector && <div style={{ fontSize:12, color:'#a0aec0' }}>📁 {o.sector}</div>}
                   <div style={{ fontSize:13, color:'#276749', fontWeight:600 }}>
                     {o.salario_min && o.salario_max ? `S/. ${o.salario_min.toLocaleString()} – ${o.salario_max.toLocaleString()}` : o.salario_min ? `S/. ${o.salario_min.toLocaleString()}+` : 'Salario a negociar'}
