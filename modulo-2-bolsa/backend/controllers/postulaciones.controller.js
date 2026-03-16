@@ -50,14 +50,14 @@ exports.misPostulaciones = async (req, res, next) => {
 // GET /api/postulaciones/oferta/:id  (empresa)
 exports.postulantesOferta = async (req, res, next) => {
   try {
-    if (req.user.rol !== 'empresa') return error(res, 'Sin permiso', 403);
+    if (!['empresa', 'admin'].includes(req.user.rol)) return error(res, 'Sin permiso', 403);
     const page = Math.max(parseInt(req.query.page || 1, 10), 1);
     const limit = Math.max(parseInt(req.query.limit || 20, 10), 1);
     const offset = (page - 1) * limit;
 
     const oferta = await db.query('SELECT id_empresa FROM bolsa_laboral.ofertas_laborales WHERE id_oferta=$1', [req.params.id]);
     if (!oferta.rows.length) return error(res, 'Oferta no encontrada', 404);
-    if (oferta.rows[0].id_empresa !== req.user.id_empresa) return error(res, 'Sin permiso sobre esta oferta', 403);
+    if (req.user.rol !== 'admin' && oferta.rows[0].id_empresa !== req.user.id_empresa) return error(res, 'Sin permiso sobre esta oferta', 403);
 
     const cnt = await db.query('SELECT COUNT(*) FROM bolsa_laboral.postulaciones WHERE id_oferta=$1', [req.params.id]);
     const r = await db.query(
@@ -81,7 +81,7 @@ exports.postulantesOferta = async (req, res, next) => {
 // PUT /api/postulaciones/:id/estado
 exports.cambiarEstado = async (req, res, next) => {
   try {
-    if (req.user.rol !== 'empresa') return error(res, 'Sin permiso', 403);
+    if (!['empresa', 'admin'].includes(req.user.rol)) return error(res, 'Sin permiso', 403);
     const { estado, notas_empresa } = req.body;
     if (!ESTADOS_POSTULACION.includes(estado)) {
       return error(res, 'Estado inválido. Use: ' + ESTADOS_POSTULACION.join(', '), 400);
@@ -96,19 +96,19 @@ exports.cambiarEstado = async (req, res, next) => {
     );
 
     if (!actual.rows.length) return error(res, 'Postulación no encontrada', 404);
-    if (actual.rows[0].id_empresa !== req.user.id_empresa) return error(res, 'Sin permiso sobre esta postulación', 403);
+    if (req.user.rol !== 'admin' && actual.rows[0].id_empresa !== req.user.id_empresa) return error(res, 'Sin permiso sobre esta postulación', 403);
 
     const transicionesValidas = {
       pendiente: ['revision'],
-      revision: ['entrevista'],
-      entrevista: ['aceptado', 'rechazado'],
-      aceptado: [],
-      rechazado: [],
+      revision: ['pendiente', 'entrevista'],
+      entrevista: ['revision', 'aceptado', 'rechazado'],
+      aceptado: ['entrevista'],
+      rechazado: ['entrevista'],
     };
 
     const estadoActual = actual.rows[0].estado;
-    if (!transicionesValidas[estadoActual].includes(estado)) {
-      return error(res, `Transición inválida: ${estadoActual} -> ${estado}`, 400);
+    if (!transicionesValidas[estadoActual]?.includes(estado)) {
+      return error(res, `Transición inválida: ${estadoActual} -> ${estado}. Solo se permite pasar al estado anterior o siguiente`, 400);
     }
 
     await db.query(
@@ -116,6 +116,63 @@ exports.cambiarEstado = async (req, res, next) => {
       [estado, notas_empresa, req.params.id]
     );
     success(res, { estado }, 'Estado actualizado');
+  } catch (e) { next(e); }
+};
+
+// DELETE /api/postulaciones/:id/cancelar
+exports.cancelarPostulacion = async (req, res, next) => {
+  try {
+    if (req.user.rol !== 'egresado') return error(res, 'Solo egresados pueden cancelar su postulación', 403);
+
+    const row = await db.query(
+      `SELECT id_postulacion, id_egresado, estado
+       FROM bolsa_laboral.postulaciones
+       WHERE id_postulacion = $1`,
+      [req.params.id]
+    );
+
+    if (!row.rows.length) return error(res, 'Postulación no encontrada', 404);
+    const post = row.rows[0];
+
+    if (post.id_egresado !== req.user.id_egresado) {
+      return error(res, 'No puedes cancelar postulaciones de otro egresado', 403);
+    }
+
+    if (!['pendiente', 'revision'].includes(post.estado)) {
+      return error(res, 'Solo se puede cancelar una postulación en estado pendiente o revisión', 400);
+    }
+
+    await db.query('DELETE FROM bolsa_laboral.postulaciones WHERE id_postulacion = $1', [req.params.id]);
+    success(res, { id_postulacion: req.params.id }, 'Postulación cancelada exitosamente');
+  } catch (e) { next(e); }
+};
+
+// GET /api/postulaciones/admin
+exports.adminListadoPostulaciones = async (req, res, next) => {
+  try {
+    if (req.user.rol !== 'admin') return error(res, 'Solo admin', 403);
+
+    const page = Math.max(parseInt(req.query.page || 1, 10), 1);
+    const limit = Math.max(parseInt(req.query.limit || 25, 10), 1);
+    const offset = (page - 1) * limit;
+
+    const cnt = await db.query('SELECT COUNT(*) FROM bolsa_laboral.postulaciones');
+    const r = await db.query(
+      `SELECT p.id_postulacion, p.estado, p.puntaje_match, p.fecha_postulacion,
+              o.id_oferta, o.titulo AS oferta_titulo,
+              emp.nombre_comercial AS empresa,
+              per.nombres, per.apellidos, per.email
+       FROM bolsa_laboral.postulaciones p
+       JOIN bolsa_laboral.ofertas_laborales o ON o.id_oferta = p.id_oferta
+       JOIN bolsa_laboral.empresas emp ON emp.id_empresa = o.id_empresa
+       JOIN egresados_unt.egresados e ON e.id_egresado = p.id_egresado
+       JOIN egresados_unt.personas per ON per.id_persona = e.id_persona
+       ORDER BY p.fecha_postulacion DESC
+       LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+
+    success(res, r.rows, 'Listado admin de postulaciones', 200, paginate(page, limit, parseInt(cnt.rows[0].count, 10)));
   } catch (e) { next(e); }
 };
 

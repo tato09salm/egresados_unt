@@ -12,6 +12,8 @@ const s = {
   btn: { padding:'8px 18px', background:'#276749', color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontSize:13, fontWeight:700 },
   btnOutline: { padding:'8px 18px', background:'#f8fafc', border:'1.5px solid #0f766e', color:'#0f766e', borderRadius:7, cursor:'pointer', fontSize:13, fontWeight:700 },
   btnSecondary: { padding:'8px 18px', background:'#1d4ed8', color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontSize:13, fontWeight:700 },
+  btnWarn: { padding:'7px 12px', background:'#e53e3e', color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontSize:12, fontWeight:700 },
+  btnEdit: { padding:'7px 12px', background:'#2d6a9f', color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontSize:12, fontWeight:700 },
   btnPdf: { padding:'8px 18px', background:'#ef4444', color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontSize:13, fontWeight:800 },
   btnAddSkill: { padding:'8px 18px', background:'#0891b2', color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontSize:13, fontWeight:700 },
   grid: { display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(320px,1fr))', gap:20 },
@@ -21,14 +23,21 @@ const s = {
   chipClose: { border:'none', background:'transparent', color:'#2b6cb0', cursor:'pointer', fontSize:14, lineHeight:1 },
   helperError: { width:'100%', fontSize:12, color:'#c53030', marginTop:2 },
   matchesBox: { width:'100%', padding:'10px 12px', border:'1px dashed #cbd5e1', borderRadius:8, background:'#f8fafc', fontSize:12, color:'#334155' },
+  modalBackdrop: { position:'fixed', inset:0, background:'rgba(15,23,42,.45)', display:'flex', justifyContent:'center', alignItems:'center', zIndex:1000, padding:'18px' },
+  modalCard: { width:'100%', maxWidth:680, background:'#fff', borderRadius:14, padding:20, boxShadow:'0 10px 30px rgba(0,0,0,.2)' },
+  modalTitle: { fontSize:17, fontWeight:800, color:'#1a365d', marginBottom:14 },
+  modalGrid: { display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 },
+  modalActions: { display:'flex', justifyContent:'flex-end', gap:8, marginTop:14 },
 };
 
 const modalidadColor = { presencial:'#276749', remoto:'#2d6a9f', hibrido:'#744210' };
 const contratoOpts = ['indefinido', 'plazo_fijo', 'practicas', 'services'];
+const estadoOfertaOpts = ['activa', 'pausada', 'borrador', 'cerrada'];
 
 export default function BolsaLaboral() {
   const [ofertas, setOfertas] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [filtros, setFiltros] = useState({ modalidad:'', sector:'', salario_min:'', salario_max:'', tipo_contrato:'' });
   const [sectores, setSectores] = useState([]);
   const [habilidadesCatalogo, setHabilidadesCatalogo] = useState([]);
@@ -39,6 +48,8 @@ export default function BolsaLaboral() {
   const [pagination, setPagination] = useState(null);
   const [page, setPage] = useState(1);
   const [recomendadas, setRecomendadas] = useState([]);
+  const [editandoOferta, setEditandoOferta] = useState(null);
+  const [savingEdit, setSavingEdit] = useState(false);
   const user = JSON.parse(localStorage.getItem('sge_user') || '{}');
   const navigate = useNavigate();
 
@@ -126,12 +137,19 @@ export default function BolsaLaboral() {
 
   const cargarOfertas = async () => {
     setLoading(true);
+    setLoadError('');
     try {
       const params = buildParams(page, 9);
       const r = await api.get(`/api/ofertas?${params}`);
       setOfertas(r.data.data || []);
       setPagination(r.data.pagination);
-    } catch(e) { if(e.response?.status===401) navigate('/login'); }
+    } catch(e) {
+      if (e.response?.status === 401) {
+        navigate('/login');
+      } else {
+        setLoadError(e.response?.data?.message || 'No se pudieron cargar las ofertas en este momento.');
+      }
+    }
     setLoading(false);
   };
 
@@ -194,13 +212,62 @@ export default function BolsaLaboral() {
     }
   };
 
+  const puedeGestionarOferta = (o) => (
+    user.rol === 'admin' || (user.rol === 'empresa' && user.id_empresa === o.id_empresa)
+  );
+
+  const abrirEditor = (e, oferta) => {
+    e.stopPropagation();
+    setEditandoOferta({
+      id_oferta: oferta.id_oferta,
+      titulo: oferta.titulo || '',
+      descripcion: oferta.descripcion || '',
+      requisitos: oferta.requisitos || '',
+      salario_min: oferta.salario_min || '',
+      salario_max: oferta.salario_max || '',
+      modalidad: oferta.modalidad || 'presencial',
+      tipo_contrato: oferta.tipo_contrato || 'indefinido',
+      vacantes: oferta.vacantes || 1,
+      estado: oferta.estado || 'activa',
+    });
+  };
+
+  const guardarEdicion = async () => {
+    if (!editandoOferta) return;
+    setSavingEdit(true);
+    try {
+      const { id_oferta, ...payload } = editandoOferta;
+      await api.put(`/api/ofertas/${id_oferta}`, payload);
+      setEditandoOferta(null);
+      await cargarOfertas();
+    } catch (e) {
+      alert(e.response?.data?.message || 'No se pudo editar la oferta');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const eliminarOferta = async (e, oferta) => {
+    e.stopPropagation();
+    const ok = window.confirm(`¿Eliminar la oferta "${oferta.titulo}"? Esta acción quitará también sus postulaciones.`);
+    if (!ok) return;
+
+    try {
+      await api.delete(`/api/ofertas/${oferta.id_oferta}`);
+      setOfertas((prev) => prev.filter((x) => x.id_oferta !== oferta.id_oferta));
+    } catch (err) {
+      alert(err.response?.data?.message || 'No se pudo eliminar la oferta');
+    }
+  };
+
   return (
     <div style={s.page}>
       <div style={s.body}>
         {/* Panel de Navegación de Bolsa */}
         <div style={{ display:'flex', gap:12, marginBottom:20 }}>
           {user.rol === 'egresado' && <button style={{...s.btn, background:'#1a365d'}} onClick={() => navigate('/bolsa/postulaciones')}>📁 Mis Postulaciones</button>}
-          {user.rol === 'empresa' && <button style={{...s.btn, background:'#1a365d'}} onClick={() => navigate('/bolsa/empresa')}>🏢 Panel Empresa</button>}
+          {(user.rol === 'empresa' || user.rol === 'admin') && <button style={{...s.btn, background:'#1a365d'}} onClick={() => navigate('/bolsa/empresa')}>🏢 Panel Ofertas</button>}
+          <button style={{...s.btn, background:'#0f766e'}} onClick={() => navigate('/bolsa/estadisticas')}>📊 Estadísticas</button>
         </div>
 
         {/* Recomendadas para egresados */}
@@ -277,9 +344,6 @@ export default function BolsaLaboral() {
           <div style={{ marginLeft:'auto', display:'flex', gap:8, flexWrap:'wrap' }}>
             <button style={s.btnOutline} onClick={() => { setFiltros({ modalidad:'', sector:'', salario_min:'', salario_max:'', tipo_contrato:'' }); setHabilidadesSeleccionadas([]); setHabilidadInput(''); setPage(1); }}>🧹 Limpiar</button>
             <button style={s.btnPdf} onClick={exportarOfertasPdf} disabled={exportingPdf}>{exportingPdf ? '⏳ Generando PDF...' : '📄 Descargar PDF'}</button>
-            {user.rol === 'empresa' && (
-              <button style={s.btn} onClick={() => navigate('/bolsa/empresa/oferta/nueva')}>🏢 + Nueva Oferta</button>
-            )}
           </div>
 
           {salarioInvalido && <div style={s.helperError}>Se detecto un rango invertido. El sistema lo corrige automaticamente para filtrar.</div>}
@@ -309,6 +373,11 @@ export default function BolsaLaboral() {
         {/* Listado */}
         {loading ? (
           <div style={{ textAlign:'center', padding:60, color:'#718096' }}>Cargando ofertas...</div>
+        ) : loadError ? (
+          <div style={{ background:'#fff5f5', border:'1px solid #feb2b2', color:'#c53030', borderRadius:10, padding:16, textAlign:'center' }}>
+            <div style={{ marginBottom:10 }}>{loadError}</div>
+            <button style={s.btn} onClick={cargarOfertas}>Reintentar</button>
+          </div>
         ) : (
           <>
             <div style={{ fontSize:13, color:'#718096', marginBottom:16 }}>
@@ -339,6 +408,12 @@ export default function BolsaLaboral() {
                     <span>📅 {new Date(o.fecha_publicacion).toLocaleDateString('es-PE')}</span>
                     <span>👥 {o.total_postulantes || 0} postulantes · {o.vacantes} vacante{o.vacantes>1?'s':''}</span>
                   </div>
+                  {puedeGestionarOferta(o) && (
+                    <div style={{ display:'flex', gap:8, marginTop:10 }}>
+                      <button style={s.btnEdit} onClick={(e) => abrirEditor(e, o)}>✏️ Editar</button>
+                      <button style={s.btnWarn} onClick={(e) => eliminarOferta(e, o)}>🗑️ Eliminar</button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -352,6 +427,35 @@ export default function BolsaLaboral() {
               </div>
             )}
           </>
+        )}
+
+        {editandoOferta && (
+          <div style={s.modalBackdrop} onClick={() => setEditandoOferta(null)}>
+            <div style={s.modalCard} onClick={(e) => e.stopPropagation()}>
+              <div style={s.modalTitle}>Editar oferta laboral</div>
+              <div style={s.modalGrid}>
+                <input style={s.input} placeholder="Título" value={editandoOferta.titulo} onChange={(e) => setEditandoOferta((p) => ({ ...p, titulo: e.target.value }))} />
+                <select style={s.input} value={editandoOferta.modalidad} onChange={(e) => setEditandoOferta((p) => ({ ...p, modalidad: e.target.value }))}>
+                  {['presencial','remoto','hibrido'].map((m) => <option key={m} value={m}>{m}</option>)}
+                </select>
+                <input style={s.input} type="number" min="0" placeholder="Salario mínimo" value={editandoOferta.salario_min} onChange={(e) => setEditandoOferta((p) => ({ ...p, salario_min: e.target.value }))} />
+                <input style={s.input} type="number" min="0" placeholder="Salario máximo" value={editandoOferta.salario_max} onChange={(e) => setEditandoOferta((p) => ({ ...p, salario_max: e.target.value }))} />
+                <select style={s.input} value={editandoOferta.tipo_contrato} onChange={(e) => setEditandoOferta((p) => ({ ...p, tipo_contrato: e.target.value }))}>
+                  {contratoOpts.map((tipo) => <option key={tipo} value={tipo}>{tipo.replace('_',' ')}</option>)}
+                </select>
+                <input style={s.input} type="number" min="1" placeholder="Vacantes" value={editandoOferta.vacantes} onChange={(e) => setEditandoOferta((p) => ({ ...p, vacantes: e.target.value }))} />
+                <select style={s.input} value={editandoOferta.estado} onChange={(e) => setEditandoOferta((p) => ({ ...p, estado: e.target.value }))}>
+                  {estadoOfertaOpts.map((estado) => <option key={estado} value={estado}>{estado}</option>)}
+                </select>
+              </div>
+              <textarea style={{ ...s.input, marginTop:10, minHeight:70, width:'100%' }} placeholder="Descripción" value={editandoOferta.descripcion} onChange={(e) => setEditandoOferta((p) => ({ ...p, descripcion: e.target.value }))} />
+              <textarea style={{ ...s.input, marginTop:8, minHeight:60, width:'100%' }} placeholder="Requisitos" value={editandoOferta.requisitos} onChange={(e) => setEditandoOferta((p) => ({ ...p, requisitos: e.target.value }))} />
+              <div style={s.modalActions}>
+                <button style={s.btnOutline} onClick={() => setEditandoOferta(null)}>Cancelar</button>
+                <button style={s.btn} onClick={guardarEdicion} disabled={savingEdit}>{savingEdit ? 'Guardando...' : 'Guardar cambios'}</button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

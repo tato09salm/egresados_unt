@@ -9,6 +9,7 @@ router.get('/sectores',     verifyToken, ctrl.getSectores);
 router.get('/habilidades',  verifyToken, ctrl.getHabilidades);
 router.get('/:id',          verifyToken, ctrl.getById);
 router.put('/:id',          verifyToken, ctrl.update);
+router.delete('/:id',       verifyToken, ctrl.remove);
 router.delete('/:id/cerrar', verifyToken, ctrl.cerrar);
 router.post('/:id/postular', verifyToken, post.postular);
 module.exports = router;

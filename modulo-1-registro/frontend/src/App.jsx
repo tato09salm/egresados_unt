@@ -16,6 +16,7 @@ import DetalleOferta from './modules/bolsa/DetalleOferta.jsx';
 import MisPostulaciones from './modules/bolsa/MisPostulaciones.jsx';
 import DashboardEmpresa from './modules/bolsa/DashboardEmpresa.jsx';
 import CrearOferta from './modules/bolsa/CrearOferta.jsx';
+import EstadisticasBolsa from './modules/bolsa/EstadisticasBolsa.jsx';
 
 // Páginas del Módulo 3 (Seguimiento)
 import DashboardSeguimiento from './modules/seguimiento/Dashboard.jsx';
@@ -66,6 +67,7 @@ export default function App() {
           <Route path="/bolsa/postulaciones" element={<MisPostulaciones />} />
           <Route path="/bolsa/empresa"      element={<DashboardEmpresa />} />
           <Route path="/bolsa/empresa/oferta/nueva" element={<CrearOferta />} />
+          <Route path="/bolsa/estadisticas" element={<EstadisticasBolsa />} />
 
           {/* Módulo 3: Seguimiento */}
           <Route path="/seguimiento"        element={<DashboardSeguimiento />} />

@@ -113,7 +113,12 @@ cd modulo-4-mentores/frontend && npm install && npm run dev
 |------|---------|-----------|--------|
 | Administrador | `admin` | `Admin2024!` | Todos |
 | Empresa | `rrhh@techsol.com` | `Empresa2024!` | Bolsa Laboral |
-| Egresado | (Registrar nuevo) | — | Registro |
+| Empresa | `talento@indtrujillo.com` | `Empresa2024!` | Bolsa Laboral |
+| Egresado | `rosa.mendoza` | `Egresado2024!` | Registro / Bolsa |
+| Egresado | `jorge.nunez` | `Egresado2024!` | Registro / Bolsa |
+| Egresado | `elena.quispe` | `Egresado2024!` | Registro / Bolsa |
+| Egresado | `diego.cruz` | `Egresado2024!` | Registro / Bolsa |
+| Egresado | `maria.flores` | `Egresado2024!` | Registro / Bolsa |
 
 ---
 

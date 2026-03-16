@@ -17,6 +17,7 @@ const estadoLabel = { pendiente:'Pendiente', revision:'En Revisión', entrevista
 export default function MisPostulaciones() {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [cancelandoId, setCancelandoId] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -25,6 +26,23 @@ export default function MisPostulaciones() {
       .catch(() => navigate('/login'))
       .finally(() => setLoading(false));
   }, []);
+
+  const cancelar = async (e, p) => {
+    e.stopPropagation();
+    if (!['pendiente', 'revision'].includes(p.estado)) return;
+    const ok = window.confirm(`¿Cancelar tu postulación a "${p.titulo}"?`);
+    if (!ok) return;
+
+    setCancelandoId(p.id_postulacion);
+    try {
+      await api.delete(`/api/postulaciones/${p.id_postulacion}/cancelar`);
+      setPosts((prev) => prev.filter((x) => x.id_postulacion !== p.id_postulacion));
+    } catch (err) {
+      alert(err.response?.data?.message || 'No se pudo cancelar la postulación');
+    } finally {
+      setCancelandoId('');
+    }
+  };
 
   return (
     <div style={s.page}>
@@ -48,6 +66,26 @@ export default function MisPostulaciones() {
                 {p.puntaje_match && <div style={{ fontSize:20, fontWeight:700, color:'#276749', marginTop:6 }}>{p.puntaje_match}%</div>}
               </div>
             </div>
+            {['pendiente', 'revision'].includes(p.estado) && (
+              <div style={{ marginTop:12, display:'flex', justifyContent:'flex-end' }}>
+                <button
+                  onClick={(e) => cancelar(e, p)}
+                  disabled={cancelandoId === p.id_postulacion}
+                  style={{
+                    padding:'7px 12px',
+                    borderRadius:8,
+                    border:'1px solid #e53e3e',
+                    background:'#fff5f5',
+                    color:'#c53030',
+                    fontWeight:700,
+                    fontSize:12,
+                    cursor:'pointer'
+                  }}
+                >
+                  {cancelandoId === p.id_postulacion ? 'Cancelando...' : 'Cancelar postulación'}
+                </button>
+              </div>
+            )}
             {/* Timeline de estados */}
             <div style={{ display:'flex', marginTop:16, gap:0 }}>
               {['pendiente','revision','entrevista', p.estado === 'rechazado' ? 'rechazado' : 'aceptado'].map((e,i) => {

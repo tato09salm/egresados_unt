@@ -17,9 +17,13 @@ const s = {
 };
 
 export default function CrearOferta() {
+  const user = JSON.parse(localStorage.getItem('sge_user') || '{}');
+  const isAdmin = user?.rol === 'admin';
   const [form, setForm] = useState({ titulo:'', descripcion:'', requisitos:'', beneficios:'', salario_min:'', salario_max:'', modalidad:'presencial', tipo_contrato:'indefinido', vacantes:1 });
   const [habilidades, setHabilidades] = useState([]);
   const [selected, setSelected] = useState({});
+  const [empresas, setEmpresas] = useState([]);
+  const [idEmpresa, setIdEmpresa] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -29,6 +33,16 @@ export default function CrearOferta() {
     api.get('/api/ofertas/habilidades')
       .then((r) => setHabilidades(r.data.data || []))
       .catch(() => {});
+
+    if (isAdmin) {
+      api.get('/api/empresas')
+        .then((r) => {
+          const list = r.data.data || [];
+          setEmpresas(list);
+          if (list[0]) setIdEmpresa(list[0].id_empresa);
+        })
+        .catch(() => {});
+    }
   }, []);
 
   const toggleHabilidad = (id) => {
@@ -49,9 +63,16 @@ export default function CrearOferta() {
   const handleSubmit = async e => {
     e.preventDefault(); setError(''); setLoading(true);
     try {
+      if (isAdmin && !idEmpresa) {
+        setError('Selecciona una empresa para publicar la oferta');
+        setLoading(false);
+        return;
+      }
+
       const payload = {
         ...form,
         habilidades: Object.entries(selected).map(([id_habilidad, requerida]) => ({ id_habilidad, requerida })),
+        ...(isAdmin ? { id_empresa: idEmpresa } : {}),
       };
       await api.post('/api/ofertas', payload);
       navigate('/bolsa/empresa');
@@ -68,6 +89,18 @@ export default function CrearOferta() {
       <div style={s.body}>
         <div style={s.card}>
           <form onSubmit={handleSubmit}>
+            {isAdmin && (
+              <>
+                <label style={s.label}>Empresa propietaria *</label>
+                <select style={s.select} value={idEmpresa} onChange={e=>setIdEmpresa(e.target.value)} required>
+                  {!empresas.length && <option value="">Sin empresas disponibles</option>}
+                  {empresas.map((emp) => (
+                    <option key={emp.id_empresa} value={emp.id_empresa}>{emp.nombre_comercial || emp.razon_social}</option>
+                  ))}
+                </select>
+              </>
+            )}
+
             <label style={s.label}>Título del puesto *</label>
             <input style={s.input} value={form.titulo} onChange={e=>set('titulo',e.target.value)} required placeholder="Ej: Desarrollador Full Stack Senior" />
 

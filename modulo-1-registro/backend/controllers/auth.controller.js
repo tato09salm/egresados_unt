@@ -127,46 +127,86 @@ exports.login = async (req, res, next) => {
       [username]
     );
 
-    if (result.rows.length === 0) {
+    if (result.rows.length > 0) {
+      const user = result.rows[0];
+      console.log(`✅ Usuario hallado: ${user.username}, Rol: ${user.rol}, Activo: ${user.activo}`);
+
+      if (!user.activo) {
+        return error(res, 'Cuenta desactivada. Contacte al administrador', 403);
+      }
+
+      const isValid = await bcrypt.compare(password, user.password_hash);
+      console.log(`🔐 Verificación de password para ${username}: ${isValid ? 'ÉXITO' : 'FALLO'}`);
+
+      if (!isValid) {
+        return error(res, 'Credenciales inválidas', 401);
+      }
+
+      await db.query('UPDATE egresados_unt.usuarios SET ultimo_login = NOW() WHERE id_usuario = $1', [user.id_usuario]);
+
+      const token = jwt.sign(
+        { id_usuario: user.id_usuario, id_persona: user.id_persona, id_egresado: user.id_egresado, rol: user.rol, username: user.username },
+        JWT_SECRET,
+        { expiresIn: JWT_EXPIRES_IN }
+      );
+
+      return success(res, {
+        token,
+        user: {
+          id_usuario: user.id_usuario,
+          id_egresado: user.id_egresado,
+          username: user.username,
+          nombres: user.nombres,
+          apellidos: user.apellidos,
+          email: user.email,
+          rol: user.rol,
+          es_admin: user.rol === 'admin',
+          tiene_egresado: !!user.id_egresado
+        }
+      }, 'Login exitoso');
+    }
+
+    const empresaResult = await db.query(
+      `SELECT ue.id_usuario_emp, ue.id_empresa, ue.email, ue.password_hash, ue.activo, ue.nombre,
+              emp.razon_social, emp.nombre_comercial
+       FROM bolsa_laboral.usuarios_empresa ue
+       JOIN bolsa_laboral.empresas emp ON emp.id_empresa = ue.id_empresa
+       WHERE ue.email = $1`,
+      [username]
+    );
+
+    if (empresaResult.rows.length === 0) {
       console.log(`❌ Usuario no encontrado: ${username}`);
       return error(res, 'Credenciales inválidas', 401);
     }
 
-    const user = result.rows[0];
-    console.log(`✅ Usuario hallado: ${user.username}, Rol: ${user.rol}, Activo: ${user.activo}`);
+    const empresa = empresaResult.rows[0];
+    if (!empresa.activo) return error(res, 'Cuenta de empresa desactivada', 403);
 
-    if (!user.activo) {
-      return error(res, 'Cuenta desactivada. Contacte al administrador', 403);
-    }
+    const isEmpresaValid = await bcrypt.compare(password, empresa.password_hash);
+    if (!isEmpresaValid) return error(res, 'Credenciales inválidas', 401);
 
-    const isValid = await bcrypt.compare(password, user.password_hash);
-    console.log(`🔐 Verificación de password para ${username}: ${isValid ? 'ÉXITO' : 'FALLO'}`);
-    
-    if (!isValid) {
-      return error(res, 'Credenciales inválidas', 401);
-    }
+    await db.query('UPDATE bolsa_laboral.usuarios_empresa SET ultimo_login = NOW() WHERE id_usuario_emp = $1', [empresa.id_usuario_emp]);
 
-    // Actualizar último login
-    await db.query('UPDATE egresados_unt.usuarios SET ultimo_login = NOW() WHERE id_usuario = $1', [user.id_usuario]);
-
-    const token = jwt.sign(
-      { id_usuario: user.id_usuario, id_persona: user.id_persona, id_egresado: user.id_egresado, rol: user.rol, username: user.username },
+    const empresaToken = jwt.sign(
+      { id_usuario: empresa.id_usuario_emp, id_empresa: empresa.id_empresa, rol: 'empresa', username: empresa.email },
       JWT_SECRET,
       { expiresIn: JWT_EXPIRES_IN }
     );
 
-    success(res, {
-      token,
+    return success(res, {
+      token: empresaToken,
       user: {
-        id_usuario: user.id_usuario,
-        id_egresado: user.id_egresado,
-        username: user.username,
-        nombres: user.nombres,
-        apellidos: user.apellidos,
-        email: user.email,
-        rol: user.rol,
-        es_admin: user.rol === 'admin',
-        tiene_egresado: !!user.id_egresado
+        id_usuario: empresa.id_usuario_emp,
+        id_empresa: empresa.id_empresa,
+        username: empresa.email,
+        nombres: empresa.nombre || empresa.nombre_comercial || 'Empresa',
+        apellidos: '',
+        email: empresa.email,
+        razon_social: empresa.razon_social,
+        rol: 'empresa',
+        es_admin: false,
+        tiene_egresado: false
       }
     }, 'Login exitoso');
   } catch (err) {
@@ -179,6 +219,20 @@ exports.login = async (req, res, next) => {
  */
 exports.me = async (req, res, next) => {
   try {
+    if (req.user.rol === 'empresa') {
+      const empresa = await db.query(
+        `SELECT ue.id_usuario_emp AS id_usuario, ue.email AS username, ue.email, ue.nombre,
+                ue.cargo, ue.ultimo_login, ue.activo,
+                emp.id_empresa, emp.razon_social, emp.nombre_comercial, emp.sector
+         FROM bolsa_laboral.usuarios_empresa ue
+         JOIN bolsa_laboral.empresas emp ON emp.id_empresa = ue.id_empresa
+         WHERE ue.id_usuario_emp = $1`,
+        [req.user.id_usuario]
+      );
+      if (empresa.rows.length === 0) return error(res, 'Usuario empresa no encontrado', 404);
+      return success(res, { ...empresa.rows[0], rol: 'empresa' });
+    }
+
     const result = await db.query(
       `SELECT u.id_usuario, u.username, u.rol, u.activo, u.ultimo_login,
               p.id_persona, p.nombres, p.apellidos, p.email, p.telefono, p.foto_url,
