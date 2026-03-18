@@ -12,7 +12,7 @@ export function useAuth() {
     setLoading(true); setError(null);
     try {
       const res = await api.post('/api/auth/login', { username, password });
-      const { token, user: userData } = res.data.data;
+      const { token, access_id, user: userData } = res.data.data;
       
       const authData = {
         ...userData,
@@ -21,6 +21,7 @@ export function useAuth() {
       };
 
       localStorage.setItem('sge_token', token);
+      if (access_id) localStorage.setItem('sge_access_id', access_id);
       localStorage.setItem('sge_user', JSON.stringify(authData));
       setUser(authData);
       return authData;
@@ -58,6 +59,7 @@ export function useAuth() {
   const logout = useCallback(() => {
     localStorage.removeItem('sge_token');
     localStorage.removeItem('sge_user');
+    localStorage.removeItem('sge_access_id');
     setUser(null);
   }, []);
 

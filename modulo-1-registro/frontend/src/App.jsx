@@ -1,5 +1,5 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import Navbar from '../../../shared/frontend/components/Navbar/Navbar';
 import Login    from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
@@ -9,6 +9,8 @@ import RegistroEgresado from './pages/RegistroEgresado.jsx';
 import PerfilEgresado from './pages/PerfilEgresado.jsx';
 import AdminUsuarios from './pages/admin/AdminUsuarios.jsx';
 import AdminEgresadosCrear from './pages/admin/AdminEgresadosCrear.jsx';
+import BitacoraAuditoria from './pages/admin/BitacoraAuditoria.jsx';
+import api from './services/api';
 
 // Páginas del Módulo 2 (Bolsa)
 import BolsaLaboral from './modules/bolsa/BolsaLaboral.jsx';
@@ -31,6 +33,23 @@ import DashboardMentor from './modules/mentores/DashboardMentor.jsx';
 const PrivateLayout = () => {
   const token = localStorage.getItem('sge_token');
   if (!token) return <Navigate to="/login" replace />;
+
+  const location = useLocation();
+
+  useEffect(() => {
+    const accessId = localStorage.getItem('sge_access_id');
+    if (!accessId) return;
+
+    const path = location.pathname || '';
+    let modulo = 'inicio';
+    if (path.startsWith('/bolsa')) modulo = 'bolsa';
+    else if (path.startsWith('/seguimiento') || path.startsWith('/encuesta')) modulo = 'seguimiento';
+    else if (path.startsWith('/mentores') || path.startsWith('/mi-mentoria') || path.startsWith('/dashboard-mentor')) modulo = 'mentores';
+    else if (path.startsWith('/admin')) modulo = 'registro';
+    else if (path.startsWith('/perfil') || path.startsWith('/dashboard') || path.startsWith('/registro-egresado')) modulo = 'registro';
+
+    api.post('/api/auth/track-module', { access_id: accessId, modulo }).catch(() => {});
+  }, [location.pathname]);
   
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f7fafc' }}>
@@ -60,6 +79,7 @@ export default function App() {
           <Route path="/perfil-egresado/:id" element={<PerfilEgresado />} />
           <Route path="/admin/usuarios" element={<AdminUsuarios />} />
           <Route path="/admin/egresados/crear" element={<AdminEgresadosCrear />} />
+          <Route path="/admin/bitacora" element={<BitacoraAuditoria />} />
 
           {/* Módulo 2: Bolsa Laboral */}
           <Route path="/bolsa"              element={<BolsaLaboral />} />

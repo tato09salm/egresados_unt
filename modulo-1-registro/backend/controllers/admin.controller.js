@@ -150,3 +150,35 @@ exports.eliminarEgresado = async (req, res, next) => {
     next(err);
   }
 };
+
+/**
+ * GET /api/admin/bitacora
+ * Lista accesos (login/logout) y el último módulo visitado
+ * Solo administrador
+ */
+exports.getBitacoraAccesos = async (req, res, next) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit || '100', 10), 500);
+    const offset = Math.max(parseInt(req.query.offset || '0', 10), 0);
+
+    const { rows } = await db.query(
+      `SELECT
+         a.id_acceso,
+         a.username,
+         a.nombres,
+         a.rol,
+         a.modulo_actual,
+         a.ingreso_at,
+         a.salida_at,
+         a.ip_origen
+       FROM auditoria.accesos a
+       ORDER BY a.ingreso_at DESC
+       LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
+
+    success(res, rows);
+  } catch (err) {
+    next(err);
+  }
+};

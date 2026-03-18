@@ -597,4 +597,32 @@ CREATE TABLE IF NOT EXISTS auditoria.logs (
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- ============================================================
+-- BITÁCORA DE ACCESOS (login/logout y módulo visitado)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS auditoria.accesos (
+  id_acceso      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  -- Usuario tipo sistema (egresados_unt.usuarios)
+  id_usuario     UUID,
+  id_persona     UUID,
+  -- Usuario tipo empresa (bolsa_laboral.usuarios_empresa)
+  id_usuario_emp UUID,
+  id_empresa     UUID,
+
+  username       VARCHAR(150) NOT NULL,
+  nombres        VARCHAR(200),
+  rol            VARCHAR(20)  NOT NULL,
+
+  ingreso_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  salida_at      TIMESTAMPTZ,
+  modulo_actual  VARCHAR(50) NOT NULL DEFAULT 'inicio',
+
+  ip_origen      VARCHAR(50),
+  user_agent     TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_accesos_ingreso_at ON auditoria.accesos(ingreso_at DESC);
+CREATE INDEX IF NOT EXISTS idx_accesos_rol        ON auditoria.accesos(rol);
+CREATE INDEX IF NOT EXISTS idx_accesos_username   ON auditoria.accesos(username);
+
 --\echo 'SGE-UNT: Base de datos inicializada correctamente'

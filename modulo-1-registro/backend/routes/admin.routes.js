@@ -9,6 +9,7 @@ router.use(isAdminMiddleware);
 
 router.get('/usuarios', ctrl.getUsuarios);
 router.get('/usuarios/sin-egresado', ctrl.getUsuariosSinEgresado);
+router.get('/bitacora', ctrl.getBitacoraAccesos);
 router.post('/egresados', ctrl.crearEgresado);
 router.delete('/egresados/:id', ctrl.eliminarEgresado);
 

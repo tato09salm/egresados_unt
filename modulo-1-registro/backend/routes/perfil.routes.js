@@ -3,7 +3,8 @@ const ctrl   = require('../controllers/perfil.controller');
 const { verifyToken } = require('../../../shared/middleware/auth');
 
 router.get('/habilidades',                    verifyToken, ctrl.getHabilidades);
-router.get('/escuelas',                       verifyToken, ctrl.getEscuelas);
+// Público: requerido para el flujo de registro (pantalla /register)
+router.get('/escuelas',                       ctrl.getEscuelas);
 router.put('/:id',                            verifyToken, ctrl.updatePerfil);
 router.post('/:id/habilidades',               verifyToken, ctrl.addHabilidad);
 router.delete('/:id/habilidades/:id_habilidad', verifyToken, ctrl.removeHabilidad);

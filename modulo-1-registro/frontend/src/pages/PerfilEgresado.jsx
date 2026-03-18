@@ -34,6 +34,7 @@ const s = {
 export default function PerfilEgresado() {
   const { id } = useParams();
   const [egresado, setEgresado] = useState(null);
+  const [empresaMe, setEmpresaMe] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
   const [editing, setEditing] = useState(false);
@@ -55,12 +56,21 @@ export default function PerfilEgresado() {
     setLoading(true);
     setErrorMsg(null);
     try {
+      // Perfil para cuentas empresa: no existe egresado asociado.
+      if (user.rol === 'empresa') {
+        const me = await api.get('/api/auth/me');
+        setEmpresaMe(me.data.data);
+        setEgresado(null);
+        return;
+      }
+
       // Si no hay ID en la URL, usamos el endpoint /perfil (del usuario actual)
       // Si hay ID, usamos /egresados/:id
       const endpoint = id ? `/api/egresados/${id}` : `/api/egresados/perfil`;
       const res = await api.get(endpoint);
       const data = res.data.data;
       setEgresado(data);
+      setEmpresaMe(null);
       setForm({
         nombres: data.nombres || '',
         apellidos: data.apellidos || '',
@@ -180,6 +190,48 @@ export default function PerfilEgresado() {
       </div>
     </div>
   );
+
+  // Vista de "Registro y Perfil" para rol empresa
+  if (user.rol === 'empresa') {
+    return (
+      <div style={s.page}>
+        <div style={s.body}>
+          <div style={s.card}>
+            <h2 style={s.h2}>Perfil de Empresa</h2>
+            <p style={s.sub}>Información básica de la cuenta de empresa.</p>
+
+            <div style={s.grid}>
+              <div>
+                <label style={s.label}>Nombre comercial</label>
+                <div style={s.value}>{empresaMe?.nombre_comercial || empresaMe?.nombre || '—'}</div>
+              </div>
+              <div>
+                <label style={s.label}>Razón social</label>
+                <div style={s.value}>{empresaMe?.razon_social || '—'}</div>
+              </div>
+              <div>
+                <label style={s.label}>Email</label>
+                <div style={s.value}>{empresaMe?.email || empresaMe?.username || '—'}</div>
+              </div>
+              <div>
+                <label style={s.label}>Sector</label>
+                <div style={s.value}>{empresaMe?.sector || '—'}</div>
+              </div>
+              <div>
+                <label style={s.label}>Último login</label>
+                <div style={s.value}>{empresaMe?.ultimo_login ? new Date(empresaMe.ultimo_login).toLocaleString() : '—'}</div>
+              </div>
+            </div>
+
+            <div style={{ marginTop: 22, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <button style={s.btn} onClick={() => navigate('/bolsa/empresa')}>Ir a Bolsa (Empresa)</button>
+              <button style={s.btnOutline} onClick={() => navigate('/dashboard')}>Ir al Inicio</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!egresado) return (
     <div style={s.page}>

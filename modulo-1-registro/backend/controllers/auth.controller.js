@@ -144,6 +144,25 @@ exports.login = async (req, res, next) => {
 
       await db.query('UPDATE egresados_unt.usuarios SET ultimo_login = NOW() WHERE id_usuario = $1', [user.id_usuario]);
 
+      // Registrar acceso (bitácora)
+      const accesoRes = await db.query(
+        `INSERT INTO auditoria.accesos
+           (id_usuario, id_persona, username, nombres, rol, modulo_actual, ip_origen, user_agent)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         RETURNING id_acceso`,
+        [
+          user.id_usuario,
+          user.id_persona,
+          user.username,
+          `${user.nombres || ''} ${user.apellidos || ''}`.trim(),
+          user.rol,
+          'registro',
+          req.ip,
+          req.get('user-agent') || null,
+        ]
+      );
+      const access_id = accesoRes.rows[0]?.id_acceso;
+
       const token = jwt.sign(
         { id_usuario: user.id_usuario, id_persona: user.id_persona, id_egresado: user.id_egresado, rol: user.rol, username: user.username },
         JWT_SECRET,
@@ -152,6 +171,7 @@ exports.login = async (req, res, next) => {
 
       return success(res, {
         token,
+        access_id,
         user: {
           id_usuario: user.id_usuario,
           id_egresado: user.id_egresado,
@@ -188,6 +208,25 @@ exports.login = async (req, res, next) => {
 
     await db.query('UPDATE bolsa_laboral.usuarios_empresa SET ultimo_login = NOW() WHERE id_usuario_emp = $1', [empresa.id_usuario_emp]);
 
+    // Registrar acceso (bitácora) para empresa
+    const accesoEmpRes = await db.query(
+      `INSERT INTO auditoria.accesos
+         (id_usuario_emp, id_empresa, username, nombres, rol, modulo_actual, ip_origen, user_agent)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id_acceso`,
+      [
+        empresa.id_usuario_emp,
+        empresa.id_empresa,
+        empresa.email,
+        empresa.nombre || empresa.nombre_comercial || empresa.razon_social || 'Empresa',
+        'empresa',
+        'bolsa',
+        req.ip,
+        req.get('user-agent') || null,
+      ]
+    );
+    const access_id = accesoEmpRes.rows[0]?.id_acceso;
+
     const empresaToken = jwt.sign(
       { id_usuario: empresa.id_usuario_emp, id_empresa: empresa.id_empresa, rol: 'empresa', username: empresa.email },
       JWT_SECRET,
@@ -196,6 +235,7 @@ exports.login = async (req, res, next) => {
 
     return success(res, {
       token: empresaToken,
+      access_id,
       user: {
         id_usuario: empresa.id_usuario_emp,
         id_empresa: empresa.id_empresa,
@@ -209,6 +249,78 @@ exports.login = async (req, res, next) => {
         tiene_egresado: false
       }
     }, 'Login exitoso');
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /api/auth/logout
+ * Marca la hora de salida en la bitácora de accesos
+ */
+exports.logout = async (req, res, next) => {
+  try {
+    const { access_id } = req.body || {};
+    if (!access_id) return error(res, 'access_id es requerido', 400);
+
+    // Asegurar que el access_id pertenece al usuario autenticado
+    const params = [access_id];
+    let where = 'id_acceso = $1 AND salida_at IS NULL';
+
+    if (req.user.rol === 'empresa') {
+      params.push(req.user.id_usuario);
+      where += ' AND id_usuario_emp = $2';
+    } else {
+      params.push(req.user.id_usuario);
+      where += ' AND id_usuario = $2';
+    }
+
+    const result = await db.query(
+      `UPDATE auditoria.accesos
+       SET salida_at = NOW()
+       WHERE ${where}
+       RETURNING id_acceso`,
+      params
+    );
+
+    if (result.rowCount === 0) {
+      return success(res, { id_acceso: access_id }, 'Sesión ya cerrada o no encontrada');
+    }
+
+    success(res, { id_acceso: result.rows[0].id_acceso }, 'Logout registrado correctamente');
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /api/auth/track-module
+ * Actualiza el módulo actual de la sesión en curso
+ */
+exports.trackModule = async (req, res, next) => {
+  try {
+    const { access_id, modulo } = req.body || {};
+    if (!access_id || !modulo) return error(res, 'access_id y modulo son requeridos', 400);
+
+    const params = [modulo, access_id];
+    let where = 'id_acceso = $2 AND salida_at IS NULL';
+
+    if (req.user.rol === 'empresa') {
+      params.push(req.user.id_usuario);
+      where += ' AND id_usuario_emp = $3';
+    } else {
+      params.push(req.user.id_usuario);
+      where += ' AND id_usuario = $3';
+    }
+
+    await db.query(
+      `UPDATE auditoria.accesos
+       SET modulo_actual = $1
+       WHERE ${where}`,
+      params
+    );
+
+    success(res, null, 'Módulo actualizado');
   } catch (err) {
     next(err);
   }

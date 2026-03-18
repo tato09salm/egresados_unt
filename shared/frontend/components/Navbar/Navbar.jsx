@@ -8,10 +8,30 @@ const Navbar = () => {
   const dropdownRef = useRef(null);
   const user = JSON.parse(localStorage.getItem('sge_user') || '{}');
 
-  const handleLogout = () => {
-    localStorage.removeItem('sge_token');
-    localStorage.removeItem('sge_user');
-    navigate('/login');
+  const handleLogout = async () => {
+    const token = localStorage.getItem('sge_token');
+    const accessId = localStorage.getItem('sge_access_id');
+    const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+    try {
+      if (token && accessId) {
+        await fetch(`${baseURL}/api/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ access_id: accessId }),
+        });
+      }
+    } catch {
+      // Si falla el registro del logout, igual se cierra sesión localmente
+    } finally {
+      localStorage.removeItem('sge_token');
+      localStorage.removeItem('sge_user');
+      localStorage.removeItem('sge_access_id');
+      navigate('/login');
+    }
   };
 
   const isActive = (basePath) =>
@@ -209,6 +229,12 @@ const Navbar = () => {
         <Link to="/mentores" className={`nav-link ${isActive('/mentores') ? 'active-link' : ''}`} style={navStyles.navLink}>
           Red de Mentores
         </Link>
+
+        {user?.rol === 'admin' && (
+          <Link to="/admin/bitacora" className={`nav-link ${isActive('/admin/bitacora') ? 'active-link' : ''}`} style={navStyles.navLink}>
+            Bitácora de auditoría
+          </Link>
+        )}
       </div>
 
       <div style={navStyles.userInfo}>
