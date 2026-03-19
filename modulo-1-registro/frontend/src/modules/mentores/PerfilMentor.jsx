@@ -291,7 +291,7 @@ export default function PerfilMentor() {
           </div>
         )}
 
-        {/* Solicitar mentoría */}
+        {/* Solicitar mentoría//comentario */}
         {user.rol === 'egresado' && (
           <div style={s.card}>
             <h3 style={{ fontSize:15, fontWeight:700, color:'#1a365d', marginBottom:12 }}>🤝 Solicitar Mentoría</h3>

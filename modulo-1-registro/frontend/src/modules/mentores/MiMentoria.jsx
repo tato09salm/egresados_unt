@@ -51,6 +51,7 @@ function EvalModal({ sesion, onSend, onCancel }) {
   };
 
   return (
+    //comentario
     <div style={s.overlay}>
       <div style={s.modal}>
         <h3 style={{ color:'#1a365d', marginBottom:8 }}>⭐ Evaluar Sesión</h3>

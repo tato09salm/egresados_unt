@@ -46,7 +46,7 @@ export default function DirectorioMentores() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Cargar filtros auxiliares
+    // Cargar filtros auxiliares //comentario
     api.get('/api/perfil/escuelas').then(r => setEscuelas(r.data.data || [])).catch(() => {});
     api.get('/api/perfil/habilidades').then(r => setHabilidades(r.data.data || [])).catch(() => {});
   }, []);

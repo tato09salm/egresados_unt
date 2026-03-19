@@ -16,7 +16,7 @@ const s = {
   backBtn: { background:'rgba(255,255,255,.15)', border:'1px solid rgba(255,255,255,.3)', color:'#fff', padding:'6px 14px', borderRadius:6, cursor:'pointer', fontSize:13 },
   input: { width:'100%', padding:'8px 12px', border:'1.5px solid #e2e8f0', borderRadius:7, fontSize:13, outline:'none', boxSizing:'border-box', background:'#fff' },
   registerCard: { background:'linear-gradient(135deg,#f3e8ff,#e9d8fd)', borderRadius:12, padding:24, border:'1px solid #d6bcfa' },
-  // Modal overlay
+  // Modal overlay //comentario
   overlay: { position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 },
   modal: { background:'#fff', borderRadius:16, padding:32, width:'90%', maxWidth:460, boxShadow:'0 20px 60px rgba(0,0,0,.3)' },
   tabBar: { display:'flex', borderBottom:'2px solid #e2e8f0', marginBottom:20, gap:0 },
