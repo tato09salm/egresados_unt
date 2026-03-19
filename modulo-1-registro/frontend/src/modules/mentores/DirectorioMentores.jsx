@@ -92,6 +92,102 @@ export default function DirectorioMentores() {
 
   const logout = () => { localStorage.removeItem('sge_token'); localStorage.removeItem('sge_user'); navigate('/login'); };
 
+  const exportarPerfilesDetalladosPDF = async () => {
+    setLoading(true);
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    
+    doc.setFontSize(22); doc.setTextColor(26,54,93);
+    doc.text('Perfiles Detallados de Mentores', 14, 20);
+    doc.setFontSize(10); doc.setTextColor(113, 128, 150);
+    doc.text(`Sistema de Gestión de Egresados UNT | Generado: ${new Date().toLocaleString('es-PE')}`, 14, 28);
+    doc.setDrawColor(226, 232, 240);
+    doc.line(14, 32, pageWidth - 14, 32);
+
+    let currentY = 40;
+
+    for (let i = 0; i < mentores.length; i++) {
+      const m = mentores[i];
+      
+      // Intentar obtener detalles completos del mentor (incluyendo estadísticas)
+      let detalles = m;
+      try {
+        const res = await api.get(`/api/mentores/${m.id_mentor}`);
+        detalles = res.data.data;
+      } catch (err) {
+        console.error(`Error al obtener detalles del mentor ${m.id_mentor}:`, err);
+      }
+
+      // Verificar si hay espacio suficiente para el siguiente perfil, si no, nueva página
+      if (currentY > 230 && i < mentores.length - 1) {
+        doc.addPage();
+        currentY = 20;
+      }
+
+      // Nombre y Cargo
+      doc.setFontSize(16); doc.setTextColor(85, 60, 154); doc.setFont('helvetica', 'bold');
+      doc.text(`${detalles.nombres} ${detalles.apellidos}`, 14, currentY);
+      currentY += 7;
+      
+      doc.setFontSize(11); doc.setTextColor(45, 55, 72); doc.setFont('helvetica', 'normal');
+      doc.text(`${detalles.cargo_actual || 'Mentor'} en ${detalles.empresa_actual || 'N/A'}`, 14, currentY);
+      currentY += 6;
+
+      // Información básica en dos columnas
+      doc.setFontSize(9); doc.setTextColor(113, 128, 150);
+      doc.text(`Escuela: ${detalles.escuela || '-'}`, 14, currentY);
+      doc.text(`Modalidad: ${detalles.modalidad || '-'}`, pageWidth / 2, currentY);
+      currentY += 5;
+      doc.text(`Disponibilidad: ${detalles.disponibilidad_horas || 0}h/semana`, 14, currentY);
+      doc.text(`Calificación: ${detalles.calificacion_promedio ? parseFloat(detalles.calificacion_promedio).toFixed(1) + '/5.0' : 'Sin calificar'}`, pageWidth / 2, currentY);
+      currentY += 8;
+
+      // Especialidades
+      if (detalles.especialidades && detalles.especialidades.length > 0) {
+        doc.setFontSize(10); doc.setTextColor(26, 54, 93); doc.setFont('helvetica', 'bold');
+        doc.text('Especialidades:', 14, currentY);
+        currentY += 5;
+        doc.setFontSize(9); doc.setTextColor(74, 85, 104); doc.setFont('helvetica', 'normal');
+        const espText = detalles.especialidades.join(' • ');
+        const splitEsp = doc.splitTextToSize(espText, pageWidth - 28);
+        doc.text(splitEsp, 14, currentY);
+        currentY += (splitEsp.length * 5) + 2;
+      }
+
+      // Estadísticas de Performance (si existen)
+      if (detalles.estadisticas) {
+        const st = detalles.estadisticas;
+        autoTable(doc, {
+          startY: currentY,
+          head: [['Tasa de Aceptación', 'Tiempo Respuesta', 'Sesiones Realizadas', 'Score Global']],
+          body: [[
+            `${st.tasa_aceptacion || 0}%`,
+            `${st.tiempo_respuesta_horas || '-'}h`,
+            `${st.sesiones_realizadas || 0}`,
+            `${st.calificacion_real || detalles.calificacion_promedio || '-'}`
+          ]],
+          theme: 'grid',
+          styles: { fontSize: 8, halign: 'center' },
+          headStyles: { fillColor: [248, 245, 255], textColor: [85, 60, 154], fontStyle: 'bold' },
+          margin: { left: 14 },
+          tableWidth: pageWidth - 28
+        });
+        currentY = doc.lastAutoTable.finalY + 12;
+      } else {
+        currentY += 5;
+      }
+
+      // Línea divisoria entre mentores
+      if (i < mentores.length - 1) {
+        doc.setDrawColor(237, 242, 247);
+        doc.line(14, currentY - 5, pageWidth - 14, currentY - 5);
+      }
+    }
+
+    setLoading(false);
+    doc.save(`perfiles_detallados_mentores_${new Date().getTime()}.pdf`);
+  };
+
   return (
     <div style={s.page}>
       <nav style={s.nav}>
@@ -107,6 +203,7 @@ export default function DirectorioMentores() {
             <button style={s.logoutBtn} onClick={() => navigate('/dashboard-mentor')}>Panel Mentor</button>
           )}
           <button style={{ ...s.logoutBtn, borderColor:'rgba(255,255,255,.3)', border:'1px solid' }} onClick={exportarPDF}>📄 PDF</button>
+          <button style={{ ...s.logoutBtn, borderColor:'rgba(255,255,255,.3)', border:'1px solid', background:'#38a169' }} onClick={exportarPerfilesDetalladosPDF}>📋 Perfiles Detallados (PDF)</button>
           <button style={s.logoutBtn} onClick={logout}>Salir</button>
         </div>
       </nav>
@@ -151,7 +248,8 @@ export default function DirectorioMentores() {
           </div>
           <div style={{ display:'flex', gap:8, alignItems:'flex-end' }}>
             <button style={s.btnGray} onClick={limpiar}>Limpiar</button>
-            <button style={{ ...s.btnOut, color:'#c53030', borderColor:'#c53030' }} onClick={exportarPDF} title="Exportar a PDF">📄 PDF</button>
+            <button style={{ ...s.btnOut, color:'#c53030', borderColor:'#c53030' }} onClick={exportarPDF} title="Exportar Directorio a PDF">📄 PDF</button>
+            <button style={{ ...s.btnOut, color:'#38a169', borderColor:'#38a169' }} onClick={exportarPerfilesDetalladosPDF} title="Exportar Perfiles Detallados a PDF">📋 Perfiles (PDF)</button>
             {user.rol === 'egresado' && (
               <button style={s.btn} onClick={() => navigate('/dashboard-mentor')}>+ Ser Mentor</button>
             )}
